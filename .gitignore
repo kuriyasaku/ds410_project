@@ -1,0 +1,24 @@
+# === General ===
+.DS_Store
+Thumbs.db
+
+# === Python ===
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# === Jupyter ===
+.ipynb_checkpoints/
+*.ipynb_*
+
+# === Data Files ===
+*.csv
+*.parquet
+*.crc
+*.Zone.Identifier
+
+# === Outputs / Logs ===
+outputs/
+logs/
+*.log
