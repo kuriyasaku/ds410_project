@@ -1,0 +1,1067 @@
+---
+title: "WineEnthusiast Preprocessing Report"
+author: "Ce Liang"
+format:
+  html:
+    toc: true
+    number-sections: true
+  pdf:
+    toc: true
+    number-sections: true
+fontsize: 11pt
+geometry: margin=1in
+editor: 
+  markdown: 
+    wrap: 72
+---
+
+# Introduction
+
+This report explains, step by step, how I cleaned and featurized the
+**Kaggle WineEnthusiast** dataset using PySpark in the notebook
+`wine_preprocessing_pyspark_c`.
+
+For each stage I describe:
+
+-   **Motivation** – why this step is needed.
+-   **What we did** – the main operations and code ideas.
+-   **Result** – how the dataset changed, and what artifacts were
+    produced.
+
+The final goal of this pipeline is to generate:
+
+-   a **clean, standardized base dataset** for exploration; and\
+-   an **ML-ready dataset** with a single `features` vector that
+    combines numeric, categorical, and text information, so that we can
+    directly plug it into regression, classification, or clustering
+    models.
+
+# Dataset
+
+## Raw data
+
+-   **Source**: Kaggle WineEnthusiast ratings dataset.
+-   **Original size**: about 130k rows.
+-   **Key columns**:\
+    `country, description, designation, points, price, province, region_1, region_2, taster_name, taster_twitter_handle, title, variety, winery`.
+
+## Motivation
+
+We treat the Kaggle export as the **only raw input**.\
+All downstream artifacts (clean data, features, ML models) must be
+reproducible from this single CSV file plus the PySpark notebook.
+
+------------------------------------------------------------------------
+
+# Step 1 — Spark session & configuration
+
+## Motivation
+
+The full dataset is reasonably large and we want to be able to scale to
+larger data in the future.\
+So I run everything in **PySpark** instead of pandas. That also matches
+the DS 410 “big data / scalable analytics” theme.
+
+## What we did
+
+In the notebook I created a Spark session with explicit settings for
+driver memory and shuffle partitions, for example:
+
+``` python
+from pyspark.sql import SparkSession
+
+spark = (
+    SparkSession.builder
+    .appName("wine-preprocessing")
+    .config("spark.driver.memory", "12g")
+    .config("spark.sql.shuffle.partitions", "200")
+    .getOrCreate()
+)
+```
+
+These settings are tuned for my environment but can be overridden when
+running on a cluster.
+
+## Result
+
+A configured SparkSession that is reused in all later steps. The same
+notebook can run on local mode (local\[4\]) or on a remote Spark cluster
+without code changes.
+
+## Step 2 — Loading the Raw CSV and Quick Inspection
+
+setting default paths
+
+``` python
+import pathlib
+
+DEFAULT_PATHS = [
+    "data/winemag-data-130k-v2.csv",
+    "winemag-data-130k-v2.csv",
+    "data/winemag-data_first150k.csv",
+    "winemag-data_first150k.csv",
+    # try at same time：
+    "/mnt/data/winemag-data-130k-v2.csv",
+    "/mnt/data/winemag-data_first150k.csv",
+]
+
+input_path = os.environ.get("WINE_CSV_PATH")
+if not input_path:
+    for p in DEFAULT_PATHS:
+        if pathlib.Path(p).exists():
+            input_path = p
+            break
+
+assert input_path and pathlib.Path(input_path).exists(), (
+    "didnt find data files，please set env viariable WINE_CSV_PATH or put CSV under ./data/ "
+)
+
+OUTPUT_DIR = pathlib.Path("outputs")
+OUTPUT_DIR.mkdir(exist_ok=True)
+
+input_path
+```
+
+## Step 3 — Read Data and Perform Initial Inspection (Infer / Correct Data Types)
+
+### What We Did
+
+In this step, the goal was to load the raw CSV safely, inspect its
+structure, remove unnecessary columns, and correct data types for
+downstream analysis. The process included four main actions:
+
+------------------------------------------------------------------------
+
+### 1. Loading the CSV with Spark
+
+We used `spark.read.csv()` with several important options:
+
+-   `header=True`: tells Spark to treat the first row as column names.
+-   `multiLine=True`: allows records that contain line breaks inside
+    quoted text (common in user-generated descriptions).
+-   `escape='"'`: allows proper parsing of embedded quotes.
+-   `inferSchema=True`: automatically infers column data types from the
+    raw file.
+
+This gives us an initial DataFrame `df_raw` along with basic metadata
+(row count and column names).
+
+------------------------------------------------------------------------
+
+### 2. Removing Useless or Auto-Generated Columns
+
+Some CSV exports — especially those from Kaggle or Excel — contain extra
+columns such as:
+
+-   `"Unnamed: 0"`
+-   `"_c0"`
+-   `"index"`
+
+These are not real variables and are usually accidental index columns.\
+Therefore, we looped through a list of known junk names and removed them
+if they exist.
+
+------------------------------------------------------------------------
+
+### 3. Fixing Incorrect Data Types
+
+Two variables require special attention:
+
+#### **a. `points`**
+
+Originally read as string in some CSV versions.\
+We explicitly convert it to integer using:
+
+-   `.cast(IntegerType())`
+
+#### **b. `price`**
+
+Some price values contain commas (e.g., `"1,200"`).\
+Spark cannot convert such strings directly into numbers, so we:
+
+1.  Cast `price` to string to ensure regex operations can apply\
+2.  Use `regexp_replace` to remove commas\
+3.  Cast the cleaned string into a proper `DoubleType`
+
+This ensures numerical columns can be analyzed, plotted, and modeled
+without errors.
+
+------------------------------------------------------------------------
+
+### 4. Previewing the Cleaned Data
+
+Finally, we print to make sure:
+
+-   The schema (`printSchema()`), to confirm correct data types\
+-   The first five rows (`show(5)`), to perform a quick sanity check
+
+This step verifies that our transformations were successful and that the
+DataFrame `df` is now ready for further cleaning or exploratory
+analysis.
+
+``` python
+from pyspark.sql import functions as F, types as T
+
+df_raw = (
+    spark.read
+    .option("header", True)
+    .option("multiLine", True)
+    .option("escape", '"')
+    .csv(input_path, inferSchema=True)
+)
+
+print("Raw count:", df_raw.count())
+print("Columns:", df_raw.columns)
+
+# Kaggle WineEnthusiast：
+expected_cols = [
+    "country","description","designation","points","price","province",
+    "region_1","region_2","taster_name","taster_twitter_handle",
+    "title","variety","winery"
+]
+
+# for ex. 'Unnamed: 0'
+for junk in ["Unnamed: 0", "_c0", "index"]:
+    if junk in df_raw.columns:
+        df_raw = df_raw.drop(junk)
+
+# fix type
+df = (
+    df_raw
+    .withColumn("points", F.col("points").cast(T.IntegerType()))
+    .withColumn("price", F.regexp_replace(F.col("price").cast(T.StringType()), ",", ""))
+    .withColumn("price", F.col("price").cast(T.DoubleType()))
+)
+
+df.printSchema()
+df.show(5, truncate=80)
+```
+
+## Step 4 — Quick Data Quality Check
+
+### Purpose
+
+Before deciding how to clean or model the data, we need a quick overview
+of which columns contain missing values and how severe the missingness
+is. This helps us determine: - which variables may need imputation, -
+which columns might be too sparse to keep, - and where data issues could
+affect modeling later.
+
+### What We Did
+
+We wrote a small helper function `null_report()` that: - counts null or
+empty-string values for each column, - calculates the missingness
+percentage, - and returns a sorted summary (most missing → least
+missing).
+
+Running the function shows: - `region_2`, `designation`, and some
+taster-related fields have high missingness, - core fields like
+`description`, `variety`, and `country` are largely complete,
+
+**region_2 column contains 79,460 missing values, accounting for 61.14%
+of the entire dataset**
+
+``` python
+from pyspark.sql import functions as F
+
+def null_report(_df):
+    total = _df.count()
+    stats = [
+        F.count(F.when(F.col(c).isNull() | (F.trim(F.col(c)) == ""), c)).alias(c)
+        for c in _df.columns
+    ]
+    row = _df.select(*stats).collect()[0].asDict()
+    return sorted([(k, v, round(v/total, 4)) for k, v in row.items()],
+                  key=lambda x: x[1], reverse=True)
+
+null_report(df)[:10]
+
+>[('region_2', 79460, 0.6114),
+ ('designation', 37465, 0.2883),
+ ('taster_twitter_handle', 31213, 0.2402),
+ ('taster_name', 26244, 0.2019),
+ ('region_1', 21247, 0.1635),
+ ('price', 8996, 0.0692),
+ ('country', 63, 0.0005),
+ ('province', 63, 0.0005),
+ ('variety', 1, 0.0),
+ ('description', 0, 0.0)]
+```
+
+## Step 5 — String Normalization and Cleaning Functions
+
+### Purpose
+
+Text columns in the raw dataset come from many different sources and
+often contain inconsistent formatting.\
+Before modeling or visualization, we need a standardized version of each
+text field (norm) so that:
+
+-   "US", "Us", and "us" are treated as the same category\
+-   accented characters (e.g., “São Paulo”) are normalized\
+-   extra spaces or irregular formatting do not create false categories\
+-   downstream grouping, clustering, and ML models become more reliable
+
+### What We Did
+
+We created a Python-based normalization function that:
+
+1.  Converts accented characters to ASCII using **Unidecode**\
+2.  Strips leading/trailing spaces\
+3.  Forces all text to lowercase\
+4.  Collapses multiple whitespaces into one
+
+We applied this function to key categorical/text fields such as\
+`country`, `province`, `region_1`, `region_2`, `variety`, `winery`,
+`taster_name`, etc.\
+For safety, we **kept the original columns** and created new ones with
+the suffix `*_norm` to compare differences.
+
+The preview confirms normalization is working as expected.
+
+``` python
+import re, unicodedata
+from unidecode import unidecode
+
+def normalize_text_py(s: str) -> str:
+    if s is None:
+        return None
+    # ASCII
+    s = unidecode(str(s))
+    s = s.strip().lower()
+    s = re.sub(r"\s+", " ", s)
+    # can add more
+    return s
+
+normalize_udf = F.udf(normalize_text_py, T.StringType()) #Register the Python function as a Spark UDF so that the Spark DataFrame can call our custom text-cleaning function
+
+# standardize string（keep original，add *_norm for checking）
+text_cols = ["country","province","region_1","region_2","variety","winery","taster_name","designation","title"]
+for c in text_cols:
+    if c in df.columns:
+        df = df.withColumn(f"{c}_norm", normalize_udf(F.col(c)))
+
+df.select([F.col(c) for c in df.columns if c.endswith("_norm")]).show(5, truncate=60)
+# We create the *_norm columns to have a clean, standardized version for modeling while still preserving the original raw text
+```
+
+## Step 6 — Deduplication Strategy
+
+### Purpose
+
+Large text-based datasets often contain repeated reviews or
+near-identical entries.\
+To avoid bias in later analyses or ML models, we need a reliable way to
+detect and remove duplicates—even when the text is slightly different
+(punctuation, casing, spacing, etc.).
+
+### What We Did
+
+We created a fingerprinting method that identifies duplicates based on
+meaningful text content rather than row position:
+
+1.  **Normalize the review text**
+
+    -   Convert `description` to lowercase\
+    -   Remove punctuation and collapse into a simple alphanumeric
+        string\
+        This captures the core meaning while ignoring formatting noise.
+
+2.  **Build a combined fingerprint**\
+    We merge three stable fields:
+
+    -   `title`\
+    -   `winery`\
+    -   normalized description
+
+    Then compute a **SHA-256 hash** (`row_fingerprint`) from this
+    combination.\
+    Each unique review should produce a unique hash.
+
+3.  **Drop duplicates based on the fingerprint**\
+    We remove repeated SHA-256 fingerprints and drop the helper columns
+    afterwards.
+
+### Result
+
+This process removed **9,985 duplicate rows** from the dataset.\
+The repeated Spark header warning is the same harmless CSV-header issue
+noted earlier.
+
+``` python
+# Step 6 — Deduplication Strategy
+
+# 1. Normalize description
+df = df.withColumn(
+    "desc_fingerprint",
+    F.lower(F.regexp_replace(F.col("description"), r"[^A-Za-z0-9]+", " ")) # Remove all non-alphanumeric characters and replace them with a space
+)
+
+# 2. Combine fields and compute SHA-256 fingerprint
+df = df.withColumn(
+    "row_fingerprint",
+    F.sha2(F.concat_ws( #Combine title, winery, and desc_fingerprint and compute a SHA-256 hash
+        "||",
+        F.coalesce(F.col("title"), F.lit("")),
+        F.coalesce(F.col("winery"), F.lit("")),
+        F.coalesce(F.col("desc_fingerprint"), F.lit(""))
+    ), 256)
+)
+
+# 3. Deduplicate
+before = df.count()
+df_dedup = (    #Perform deduplication based on the generated hash
+    df.dropDuplicates(["row_fingerprint"])
+      .drop("row_fingerprint", "desc_fingerprint")
+)
+after = df_dedup.count()
+
+print(f"Deduplicated: {before} -> {after} (removed {before - after})") #Deduplicated: 129971 -> 119986 (removed 9985)
+```
+
+## Step 7 — Handling Missing and Abnormal Values
+
+### Purpose
+
+To prepare the dataset for modeling, we need a clean and consistent
+numeric target (price) and reliable text categories.\
+This step focuses on: - fixing invalid numeric values, - imputing
+missing prices, - reducing extreme outliers, - and standardizing
+empty/invalid text fields.
+
+These operations improve the stability of statistical summaries, ML
+models, and visualizations.
+
+------------------------------------------------------------------------
+
+### What We Did
+
+#### 1. Fix invalid price values
+
+Prices ≤ 0 are not meaningful, so we convert them to NULL.
+
+#### 2. Clean text columns
+
+After normalization, empty strings are set to NULL to avoid fake
+categories.
+
+#### 3. Median imputation of missing prices
+
+For rows where price is missing, we fill it using the **median price**
+within\
+`country_norm + variety_norm`.\
+This preserves region-level pricing patterns and avoids bias from global
+averages.\
+(You can later switch to other grouping keys like
+`province_norm + variety_norm`.)
+
+#### 4. Winsorization to handle outliers
+
+We clip extremely small or large prices using the **1% and 99%
+quantiles**.\
+This keeps the data realistic while preventing a few extreme values from
+dominating models.
+
+### Result
+
+All rows remain (119,986), but: - invalid prices are corrected, -
+missing prices are imputed consistently, - text fields are normalized, -
+and numeric outliers are controlled.
+
+``` python
+# Step 7 — Handling Missing and Abnormal Values
+
+df_clean = df_dedup
+
+# 1. Mark invalid prices as NULL
+df_clean = df_clean.withColumn(
+    "price",
+    F.when(F.col("price").isNotNull() & (F.col("price") <= 0), None)
+     .otherwise(F.col("price"))
+)
+
+# 2. Convert empty normalized text fields to NULL
+for c in text_cols:
+    norm = f"{c}_norm"
+    if norm in df_clean.columns:
+        df_clean = df_clean.withColumn(
+            norm,
+            F.when(F.trim(F.col(norm)) == "", None)
+             .otherwise(F.col(norm))
+        )
+
+# 3. Median imputation for price
+groupby_keys = [c for c in ["country_norm", "variety_norm"] if c in df_clean.columns]
+
+if groupby_keys:
+    med = (
+        df_clean.groupBy(*groupby_keys)
+        .agg(F.expr("percentile_approx(price, 0.5)").alias("med_price"))
+    )
+
+    df_clean = (
+        df_clean.join(med, on=groupby_keys, how="left")
+        .withColumn(
+            "price_imputed",
+            F.when(F.col("price").isNull(), F.col("med_price"))
+             .otherwise(F.col("price"))
+        )
+        .drop("med_price")
+    )
+else:
+    df_clean = df_clean.withColumn("price_imputed", F.col("price"))
+
+# 4. Winsorization (1%–99%)
+q = df_clean.approxQuantile("price_imputed", [0.01, 0.99], 0.01)
+lower, upper = (q + [None, None])[:2]
+
+if lower is not None and upper is not None:
+    df_clean = df_clean.withColumn(
+        "price_winsor",
+        F.when(F.col("price_imputed") < lower, F.lit(lower))
+         .when(F.col("price_imputed") > upper, F.lit(upper))
+         .otherwise(F.col("price_imputed"))
+    )
+else:
+    df_clean = df_clean.withColumn("price_winsor", F.col("price_imputed"))
+
+print("Rows after cleaning:", df_clean.count())
+```
+
+## Step 8 — Variety Normalization Mapping (Synonym Merging)
+
+### Purpose
+
+Different wine regions often use different names for the same grape
+variety\
+(e.g., “pinot gris” vs. “pinot grigio,” “shiraz” vs. “syrah”).\
+If we do not unify these synonyms, analysis and modeling will treat them
+as separate categories.\
+This step ensures that varieties referring to the same grape are merged
+into a single canonical label.
+
+### What We Did
+
+1.  **Built a mapping table** (`VARIETY_MAP`)
+    -   Each canonical grape variety lists its known aliases.\
+    -   The mapping is extensible and can be expanded later.
+2.  **Created a reverse lookup**
+    -   All aliases → canonical form\
+    -   Broadcast to all Spark workers for efficient UDF lookup.
+3.  **Applied a UDF to normalize grape varieties**
+    -   If a variety is an alias, convert it to the canonical name.\
+    -   Mild rule: remove trailing “blend” where applicable.\
+    -   Output stored in a new field: `variety_canonical`.
+
+### Result
+
+The dataset now contains a standardized grape variety field, reducing
+category fragmentation and improving the reliability of later
+clustering, visualization, and ML tasks.
+
+``` python
+
+from pyspark.sql import Row
+
+VARIETY_MAP = { # create variety map
+    "cabernet sauvignon": ["cabernet sauv.", "cab sauv", "cabernet"],
+    "sauvignon blanc": ["sauv. blanc"],
+    "pinot noir": ["spatburgunder"],  # German variant (after unidecode → spatburgunder)
+    "pinot grigio": ["pinot gris"],
+    "syrah": ["shiraz"],
+    "grenache": ["garnacha"],
+    "tempranillo": [],
+    "nebbiolo": [],
+    "chardonnay": [],
+    "riesling": [],
+    "merlot": [],
+    "malbec": [],
+    "sangiovese": [],
+    "chenin blanc": ["steen"],
+    "viognier": [],
+    "gamay": [],
+    "gruner veltliner": ["gruener veltliner", "gruner veltliner"],
+}
+
+# reverse lookup: alias -> canonical
+alias_to_canonical = {}
+for canon, aliases in VARIETY_MAP.items():
+    alias_to_canonical[canon] = canon
+    for a in aliases:
+        alias_to_canonical[a] = canon
+
+broadcast_map = spark.sparkContext.broadcast(alias_to_canonical)
+
+@F.udf(T.StringType()) # define UDF process:variety_norm → variety_canonical
+def map_variety_norm(v):
+    if v is None:
+        return None
+    v = v.strip().lower()
+    if v in broadcast_map.value:
+        return broadcast_map.value[v]
+    if v.endswith(" blend"):
+        return v.replace(" blend", "").strip()
+    return v
+
+# add canonical variety
+if "variety_norm" in df_clean.columns:
+    df_clean = df_clean.withColumn("variety_canonical", map_variety_norm(F.col("variety_norm")))
+else:
+    df_clean = df_clean.withColumn("variety_canonical", F.col("variety"))
+
+df_clean.select("variety","variety_norm","variety_canonical").show(8, truncate=30)
++------------------+------------------+------------------+
+|           variety|      variety_norm| variety_canonical|
++------------------+------------------+------------------+
+|              Rosé|              rose|              rose|
+|         Zinfandel|         zinfandel|         zinfandel|
+|        Pinot Noir|        pinot noir|        pinot noir|
+|        Pinot Noir|        pinot noir|        pinot noir|
+|   Sauvignon Blanc|   sauvignon blanc|   sauvignon blanc|
+|        Chardonnay|        chardonnay|        chardonnay|
+|        Chardonnay|        chardonnay|        chardonnay|
+|Cabernet Sauvignon|cabernet sauvignon|cabernet sauvignon|
++------------------+------------------+------------------+
+```
+
+**The final cleaned and standardized variety field used for modeling and
+analysis is the variety_canonical column**
+
+## Step 9 — Description Text Cleaning and TF-IDF Feature Extraction
+
+### Purpose
+
+The wine description is the richest unstructured field in the dataset.\
+To use it for clustering, similarity search, or ML models, we need to
+convert the raw text into numerical features.\
+TF-IDF is a scalable and standard method in Spark to represent text
+meaning while down-weighting common words.
+
+### What We Did
+
+1.  **Clean the description text**
+
+    -   Convert to lowercase\
+    -   Remove non-English characters\
+        This creates a consistent text field for tokenization.
+
+2.  **Tokenize the text**\
+    Using `RegexTokenizer` to split descriptions into word tokens.
+
+3.  **Remove stopwords**\
+    Using `StopWordsRemover` to eliminate words that carry little
+    semantic meaning.
+
+4.  **Convert tokens to term frequencies**\
+    Using `CountVectorizer` to build a sparse TF matrix.\
+    `minDF` ensures we only keep meaningful terms across the corpus.
+
+5.  **Compute TF-IDF vectors**\
+    Using `IDF`, producing the final numeric representation in column
+    `tfidf`.
+
+6.  **Optional sampling**\
+    To avoid memory pressure during debugging, the pipeline supports\
+    `SAMPLE_FRACTION < 1.0` via environment variable.
+
+### Result
+
+Each wine review now has a sparse TF-IDF vector capturing key
+descriptive terms.\
+These features are immediately usable for: - clustering wines by tasting
+profile,\
+- building recommendation systems,\
+- classifying wine varieties,\
+- or exploratory text analysis.
+
+``` python
+# Step 9 — Text Cleaning and TF-IDF
+
+from pyspark.ml import Pipeline
+from pyspark.ml.feature import RegexTokenizer, StopWordsRemover, CountVectorizer, IDF
+
+# optional sampling (for debugging, 0.1 -> 1)
+SAMPLE_FRACTION = float(os.environ.get("SAMPLE_FRACTION", "1.0"))
+df_text = df_clean
+
+if SAMPLE_FRACTION < 1.0:
+    df_text = df_text.sample(False, SAMPLE_FRACTION, seed=42)
+
+# clean description text
+df_text = df_text.withColumn(
+    "description_clean",
+    F.lower(F.regexp_replace(F.col("description"), r"[^A-Za-z\s]+", " "))
+)
+
+tokenizer = RegexTokenizer(inputCol="description_clean", outputCol="tokens_raw", pattern="\W+") # "rich blackberry aroma" → ["rich", "blackberry", "aroma"]
+remover = StopWordsRemover(inputCol="tokens_raw", outputCol="tokens") # rm something like "the" "and" "with" "this" words.
+cv = CountVectorizer(inputCol="tokens", outputCol="tf", minDF=10) # Term Frequency
+idf = IDF(inputCol="tf", outputCol="tfidf", minDocFreq=10) # Inverse Document Frequency
+
+text_pipe = Pipeline(stages=[tokenizer, remover, cv, idf])
+text_model = text_pipe.fit(df_text) 
+
+df_text_feats = text_model.transform(df_text)
+
+df_text_feats.select("description", "tokens").show(5, truncate=80)
++--------------------------------------------------------------------------------+--------------------------------------------------------------------------------+
+|                                                                     description|                                                                          tokens|
++--------------------------------------------------------------------------------+--------------------------------------------------------------------------------+
+|In its Provence skittle bottle, this wine is a bright mouthful that is as eas...|[provence, skittle, bottle, wine, bright, mouthful, easy, palate, pale, color...|
+|Thick and rich, with a menthol-like streak in the background, this 89% Zin is...|[thick, rich, menthol, like, streak, background, zin, complemented, wealth, m...|
+|The fragrant mix of flowers and fruit introduces a wine already moving into s...|[fragrant, mix, flowers, fruit, introduces, wine, already, moving, secondary,...|
+|There are a lot of intriguing and unique aromas on the nose of this bottling,...|[lot, intriguing, unique, aromas, nose, bottling, candied, pomegranate, wild,...|
+|Dry, lean and tight, this is a crisply mineral Sauvignon Blanc that manges to...|[dry, lean, tight, crisply, mineral, sauvignon, blanc, manges, avoid, sense, ...|
++--------------------------------------------------------------------------------+--------------------------------------------------------------------------------+
+only showing top 5 rows
+```
+
+**By computing TF × IDF, we can measure how important a word is within a
+single sentence while also evaluating how rare it is across the entire
+corpus. The resulting sparse numerical vectors allow machine learning
+models to interpret and learn from the text**
+
+## Step 10 — Structured Feature Encoding (Indexing / One-Hot)
+
+### Purpose
+
+After cleaning and text processing, we need all structured fields to be
+in a *numerical* format so they can be combined with TF-IDF features and
+used by ML models.\
+Spark models require vectors, not strings, so categorical columns must
+be transformed.
+
+### What We Did
+
+1.  **Index categorical variables**\
+    We used `StringIndexer` to convert:
+
+    -   `country_norm`
+    -   `variety_canonical`
+    -   `province_norm`
+
+    Each category is mapped to a numerical index.
+
+2.  **One-hot encode indexed fields**\
+    Using `OneHotEncoder` to avoid imposing ordinal meaning on
+    categorical variables.\
+    Each category becomes a sparse one-hot vector.
+
+3.  **Combine all features**\
+    We then assembled:
+
+    -   numeric features (`points`, `price_winsor`)
+    -   one-hot encoded vectors
+    -   TF-IDF text features
+
+    into a single feature vector using `VectorAssembler`.
+
+4.  **Output** The final dataset `df_ready` contains a `features` column
+    suitable for:
+
+    -   regression\
+    -   classification\
+    -   clustering\
+    -   recommendation\
+    -   or any ML algorithm in Spark MLlib. \`\`\`python from
+        pyspark.ml.feature import StringIndexer, OneHotEncoder,
+        VectorAssembler from pyspark.ml import Pipeline
+
+``` python
+# Step 10 — Structured Feature Encoding (Indexing / One-Hot)
+
+from pyspark.ml.feature import StringIndexer, OneHotEncoder, VectorAssembler
+from pyspark.ml import Pipeline
+
+categorical_cols = [c for c in ["country_norm", "variety_canonical", "province_norm"]
+                    if c in df_text_feats.columns]
+
+# index categorical fields
+indexers = [
+    StringIndexer(inputCol=c, outputCol=f"{c}_idx", handleInvalid="keep")
+    for c in categorical_cols
+]
+
+# one-hot encode
+encoders = [
+    OneHotEncoder(inputCols=[f"{c}_idx"], outputCols=[f"{c}_oh"])
+    for c in categorical_cols
+]
+
+# numeric fields
+numeric_cols = [c for c in ["points", "price_winsor"] if c in df_text_feats.columns]
+
+# combine all features
+assembler = VectorAssembler(
+    inputCols=[*numeric_cols, *[f"{c}_oh" for c in categorical_cols], "tfidf"],
+    outputCol="features"
+)
+
+struct_pipe = Pipeline(stages=[*indexers, *encoders, assembler])
+struct_model = struct_pipe.fit(df_text_feats)
+df_ready = struct_model.transform(df_text_feats)
+
+df_ready.select(
+    "points", "price_winsor", *[f"{c}_oh" for c in categorical_cols], "features"
+).show(3, truncate=80)
+
+df_ready.printSchema()
+```
+
+**Step 10 prepares the dataset for model training by converting all
+fields into machine-learning-ready feature vectors**
+
+## Step 11 — Persistence and Output
+
+### Purpose
+
+After all cleaning and feature engineering steps, we save two final
+datasets and the preprocessing models.\
+Saving them allows: - fast reloading without repeating the whole
+pipeline, - consistent preprocessing across experiments, - distributed
+use (HDFS / S3 / cluster jobs), - and separation of “clean data” vs.
+“ML-ready data”.
+
+### What We Did
+
+#### 1. Save the cleaned dataset
+
+We selected the key cleaned columns and wrote them to\
+`outputs/wine_clean.parquet/`.\
+This file contains the fully cleaned but **non-vectorized** data.
+
+#### 2. PCA reduction for TF-IDF
+
+TF-IDF vectors are high-dimensional (≈8k dims), so we applied PCA to
+reduce them to **≤ 500 dimensions**.\
+This speeds up ML models and reduces memory usage.
+
+#### 3. Assemble final ML features
+
+We combined: - numerical fields (`points`, `price_winsor`), - one-hot
+encoded structured fields, - PCA-reduced TF-IDF vectors,\
+into a single `features` column suitable for MLlib.
+
+#### 4. Save ML-ready dataset
+
+The final modeling table (with `tfidf_pca` + `features`) was saved to\
+`outputs/wine_ml_ready.parquet/`.
+
+#### 5. Save preprocessing models
+
+We stored the fitted models: - text pipeline (`text_pipeline/`) -
+structured feature pipeline (`struct_pipeline/`) - PCA model
+(`pca_model/`)
+
+These reusable models ensure the exact same transformations can be
+applied later without recomputation.
+
+### Result
+
+The project now produces: - a **cleaned dataset** for EDA and
+analytics,\
+- a **model-ready dataset** for ML tasks,\
+- and **modular preprocessing models** that can be reused or deployed.
+
+**Step 11 stores all cleaned datasets, TF-IDF/PCA embeddings, structured
+encodings, the final feature vectors, and the preprocessing pipelines,
+preparing the data for actual machine learning model training.**
+
+With what we saved, we can perform a complete suite of scalable
+analytics and machine-learning experiments using wine_ml_ready.parquet,
+such as:
+
+regression models to predict prices or points,
+
+classification models for grape variety, region, or quality level,
+
+clustering wines based on PCA-reduced TF-IDF flavor profiles,
+
+k-NN similarity search for wine recommendation,
+
+and downstream visualizations built directly on the final feature
+vectors.
+
+## Step 12 — Quick Sanity Check / EDA
+
+### Purpose
+
+Before moving on to scalable analytics or ML modeling, we perform a
+quick sanity check to verify that the cleaned dataset behaves as
+expected.\
+This step is meant to confirm: - missing-value patterns are reasonable
+after cleaning, - major categorical variables have expected
+distributions, - there are no obvious issues remaining in the data.
+
+### What We Did
+
+``` python
+# report of missing values (top 12 columns)
+null_report(df_clean)[:12]
+[('region_2', 73218, 0.6102),
+ ('region_2_norm', 73218, 0.6102),
+ ('designation', 34545, 0.2879),
+ ('designation_norm', 34545, 0.2879),
+ ('taster_twitter_handle', 29446, 0.2454),
+ ('taster_name', 24917, 0.2077),
+ ('taster_name_norm', 24917, 0.2077),
+ ('region_1', 19560, 0.163),
+ ('region_1_norm', 19560, 0.163),
+ ('price', 8395, 0.07),
+ ('country_norm', 59, 0.0005),
+ ('country', 59, 0.0005)]
+ # Top 10 
+if "country_norm" in df_clean.columns:
+    display(df_clean.groupBy("country_norm").count().orderBy(F.desc("count")).limit(10))
+if "variety_canonical" in df_clean.columns:
+    display(df_clean.groupBy("variety_canonical").count().orderBy(F.desc("count")).limit(10))
+df_clean.groupBy("country_norm").count().orderBy(F.desc("count")).show(10)
+df_clean.groupBy("variety_canonical").count().orderBy(F.desc("count")).show(10)
++------------+-----+
+|country_norm|count|
++------------+-----+
+|          us|50456|
+|      france|20353|
+|       italy|17940|
+|       spain| 6116|
+|    portugal| 5256|
+|       chile| 4184|
+|   argentina| 3544|
+|     austria| 3034|
+|   australia| 2196|
+|     germany| 1992|
++------------+-----+
+only showing top 10 rows
++------------------+-----+
+| variety_canonical|count|
++------------------+-----+
+|        pinot noir|12344|
+|        chardonnay|10868|
+|cabernet sauvignon| 8850|
+|               red| 8243|
+|bordeaux-style red| 6471|
+|          riesling| 4773|
+|             syrah| 4617|
+|   sauvignon blanc| 4575|
+|              rose| 3220|
+|            merlot| 2896|
++------------------+-----+
+only showing top 10 rows
+```
+
+These are basic but essential checks to ensure: - normalized text fields
+group correctly, - synonym mapping worked, - and high-level
+distributions align with known wine data patterns\
+(e.g., U.S., France, Italy dominate; Pinot Noir and Chardonnay appear
+most frequently).
+
+### Result
+
+The cleaned dataset passes all basic sanity checks.\
+The distributions look realistic and consistent with expectations,
+indicating that the cleaning pipeline is stable and suitable for further
+analysis and modeling.
+
+## Step 13 — Appendix: How to Reuse the Same Preprocessing Pipeline on New Data
+
+### Purpose
+
+To ensure consistent predictions on future data, we do **not** refit any
+preprocessing.\
+Instead, we reuse the saved pipelines so that text cleaning,
+tokenization, TF-IDF, PCA, indexing, and one-hot encoding behave exactly
+the same as during training.
+
+### What We Did
+
+1.  Clean the new dataset using the same steps as before\
+    (normalization, missing-value handling, etc.).
+
+2.  Load the saved preprocessing models:
+
+    -   `text_pipeline` for description → tokens → TF-IDF → PCA\
+    -   `struct_pipeline` for indexing, one-hot, and feature assembly
+
+3.  Apply them in order: new_df_text =
+    loaded_text.transform(new_df_clean) new_df_ready =
+    loaded_struct.transform(new_df_text) The result includes the same
+    `tfidf_pca` and `features` columns used for modeling.
+
+### Result
+
+Any new wine review can be transformed into the **same feature space**
+as the training data, enabling consistent prediction, clustering, or
+similarity search.
+
+## Step 14 : spark.stop()
+
+## Future ML Tasks and analysis
+
+Using the processed dataset "wine_ml_ready.parquet" and the prebuilt
+"features" column(only for spark ML to read, didn't print out), we
+
+can run several straightforward machine learning tasks. The following
+three tasks are
+
+simple, computationally reasonable, and highly suitable for this
+project.
+
+------------------------------------------------------------------------
+
+### **1. Price Prediction (Regression)**
+
+**Goal:**\
+Predict the wine's price (`price_winsor`) using numeric attributes +
+text features.
+
+**Reasons:**\
+Price is continuous, the dataset is large, and `features` already
+contains TF-IDF flavor vectors + metadata, making the model easy to
+train.
+
+**Model:**\
+- Linear Regression (very stable)\
+- Optional: Random Forest Regressor
+
+**Example question to explore:**\
+- *How much do tasting notes contribute to predicting price?*\
+- *Does higher critic score (“points”) correlate with price?*
+
+------------------------------------------------------------------------
+
+### **2. Variety Classification (Multiclass)**
+
+**Goal:**\
+Predict the standardized grape variety (`variety_canonical`) based on
+description + country + province.
+
+**Reason**\
+Variety is a strong label: tasting notes often directly imply varietal
+traits (“cherry + spice” → Pinot Noir).
+
+**Model:**\
+- Logistic Regression (multiclass)\
+- Optional: Naive Bayes (works well with TF-IDF)
+
+**Example question to explore:**\
+- *Which words in tasting notes indicate a particular grape variety?*\
+- *Can a simple linear classifier distinguish red vs white varieties?*
+
+------------------------------------------------------------------------
+
+### **3. Country of Origin Prediction (Classification)**
+
+**Goal:**\
+Predict `country_norm` from a wine’s text description.
+
+**Reason:**\
+Different regions use very distinct language (“minerality”, “oak”,
+“citrus”, etc.), so even simple models perform surprisingly well.
+
+**Model:**\
+- Logistic Regression\
+- Optional: Random Forest
+
+**Example question to explore:**\
+- *Which countries are easiest or hardest to distinguish?*\
+- *What flavor words are most associated with France/US/Italy?*

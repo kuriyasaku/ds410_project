@@ -1,0 +1,1537 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.5.57">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Ce Liang">
+
+<title>WineEnthusiast Preprocessing Report</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="wine_preprocessing_report.qmd_files/libs/clipboard/clipboard.min.js"></script>
+<script src="wine_preprocessing_report.qmd_files/libs/quarto-html/quarto.js"></script>
+<script src="wine_preprocessing_report.qmd_files/libs/quarto-html/popper.min.js"></script>
+<script src="wine_preprocessing_report.qmd_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="wine_preprocessing_report.qmd_files/libs/quarto-html/anchor.min.js"></script>
+<link href="wine_preprocessing_report.qmd_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="wine_preprocessing_report.qmd_files/libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="wine_preprocessing_report.qmd_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="wine_preprocessing_report.qmd_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="wine_preprocessing_report.qmd_files/libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+
+
+</head>
+
+<body>
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+<div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+  <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">Table of contents</h2>
+   
+  <ul>
+  <li><a href="#introduction" id="toc-introduction" class="nav-link active" data-scroll-target="#introduction"><span class="header-section-number">1</span> Introduction</a></li>
+  <li><a href="#dataset" id="toc-dataset" class="nav-link" data-scroll-target="#dataset"><span class="header-section-number">2</span> Dataset</a>
+  <ul class="collapse">
+  <li><a href="#raw-data" id="toc-raw-data" class="nav-link" data-scroll-target="#raw-data"><span class="header-section-number">2.1</span> Raw data</a></li>
+  <li><a href="#motivation" id="toc-motivation" class="nav-link" data-scroll-target="#motivation"><span class="header-section-number">2.2</span> Motivation</a></li>
+  </ul></li>
+  <li><a href="#step-1-spark-session-configuration" id="toc-step-1-spark-session-configuration" class="nav-link" data-scroll-target="#step-1-spark-session-configuration"><span class="header-section-number">3</span> Step 1 — Spark session &amp; configuration</a>
+  <ul class="collapse">
+  <li><a href="#motivation-1" id="toc-motivation-1" class="nav-link" data-scroll-target="#motivation-1"><span class="header-section-number">3.1</span> Motivation</a></li>
+  <li><a href="#what-we-did" id="toc-what-we-did" class="nav-link" data-scroll-target="#what-we-did"><span class="header-section-number">3.2</span> What we did</a></li>
+  <li><a href="#result" id="toc-result" class="nav-link" data-scroll-target="#result"><span class="header-section-number">3.3</span> Result</a></li>
+  <li><a href="#step-2-loading-the-raw-csv-and-quick-inspection" id="toc-step-2-loading-the-raw-csv-and-quick-inspection" class="nav-link" data-scroll-target="#step-2-loading-the-raw-csv-and-quick-inspection"><span class="header-section-number">3.4</span> Step 2 — Loading the Raw CSV and Quick Inspection</a></li>
+  <li><a href="#step-3-read-data-and-perform-initial-inspection-infer-correct-data-types" id="toc-step-3-read-data-and-perform-initial-inspection-infer-correct-data-types" class="nav-link" data-scroll-target="#step-3-read-data-and-perform-initial-inspection-infer-correct-data-types"><span class="header-section-number">3.5</span> Step 3 — Read Data and Perform Initial Inspection (Infer / Correct Data Types)</a>
+  <ul class="collapse">
+  <li><a href="#what-we-did-1" id="toc-what-we-did-1" class="nav-link" data-scroll-target="#what-we-did-1"><span class="header-section-number">3.5.1</span> What We Did</a></li>
+  <li><a href="#loading-the-csv-with-spark" id="toc-loading-the-csv-with-spark" class="nav-link" data-scroll-target="#loading-the-csv-with-spark"><span class="header-section-number">3.5.2</span> 1. Loading the CSV with Spark</a></li>
+  <li><a href="#removing-useless-or-auto-generated-columns" id="toc-removing-useless-or-auto-generated-columns" class="nav-link" data-scroll-target="#removing-useless-or-auto-generated-columns"><span class="header-section-number">3.5.3</span> 2. Removing Useless or Auto-Generated Columns</a></li>
+  <li><a href="#fixing-incorrect-data-types" id="toc-fixing-incorrect-data-types" class="nav-link" data-scroll-target="#fixing-incorrect-data-types"><span class="header-section-number">3.5.4</span> 3. Fixing Incorrect Data Types</a></li>
+  <li><a href="#previewing-the-cleaned-data" id="toc-previewing-the-cleaned-data" class="nav-link" data-scroll-target="#previewing-the-cleaned-data"><span class="header-section-number">3.5.5</span> 4. Previewing the Cleaned Data</a></li>
+  </ul></li>
+  <li><a href="#step-4-quick-data-quality-check" id="toc-step-4-quick-data-quality-check" class="nav-link" data-scroll-target="#step-4-quick-data-quality-check"><span class="header-section-number">3.6</span> Step 4 — Quick Data Quality Check</a>
+  <ul class="collapse">
+  <li><a href="#purpose" id="toc-purpose" class="nav-link" data-scroll-target="#purpose"><span class="header-section-number">3.6.1</span> Purpose</a></li>
+  <li><a href="#what-we-did-2" id="toc-what-we-did-2" class="nav-link" data-scroll-target="#what-we-did-2"><span class="header-section-number">3.6.2</span> What We Did</a></li>
+  </ul></li>
+  <li><a href="#step-5-string-normalization-and-cleaning-functions" id="toc-step-5-string-normalization-and-cleaning-functions" class="nav-link" data-scroll-target="#step-5-string-normalization-and-cleaning-functions"><span class="header-section-number">3.7</span> Step 5 — String Normalization and Cleaning Functions</a>
+  <ul class="collapse">
+  <li><a href="#purpose-1" id="toc-purpose-1" class="nav-link" data-scroll-target="#purpose-1"><span class="header-section-number">3.7.1</span> Purpose</a></li>
+  <li><a href="#what-we-did-3" id="toc-what-we-did-3" class="nav-link" data-scroll-target="#what-we-did-3"><span class="header-section-number">3.7.2</span> What We Did</a></li>
+  </ul></li>
+  <li><a href="#step-6-deduplication-strategy" id="toc-step-6-deduplication-strategy" class="nav-link" data-scroll-target="#step-6-deduplication-strategy"><span class="header-section-number">3.8</span> Step 6 — Deduplication Strategy</a>
+  <ul class="collapse">
+  <li><a href="#purpose-2" id="toc-purpose-2" class="nav-link" data-scroll-target="#purpose-2"><span class="header-section-number">3.8.1</span> Purpose</a></li>
+  <li><a href="#what-we-did-4" id="toc-what-we-did-4" class="nav-link" data-scroll-target="#what-we-did-4"><span class="header-section-number">3.8.2</span> What We Did</a></li>
+  <li><a href="#result-1" id="toc-result-1" class="nav-link" data-scroll-target="#result-1"><span class="header-section-number">3.8.3</span> Result</a></li>
+  </ul></li>
+  <li><a href="#step-7-handling-missing-and-abnormal-values" id="toc-step-7-handling-missing-and-abnormal-values" class="nav-link" data-scroll-target="#step-7-handling-missing-and-abnormal-values"><span class="header-section-number">3.9</span> Step 7 — Handling Missing and Abnormal Values</a>
+  <ul class="collapse">
+  <li><a href="#purpose-3" id="toc-purpose-3" class="nav-link" data-scroll-target="#purpose-3"><span class="header-section-number">3.9.1</span> Purpose</a></li>
+  <li><a href="#what-we-did-5" id="toc-what-we-did-5" class="nav-link" data-scroll-target="#what-we-did-5"><span class="header-section-number">3.9.2</span> What We Did</a></li>
+  <li><a href="#result-2" id="toc-result-2" class="nav-link" data-scroll-target="#result-2"><span class="header-section-number">3.9.3</span> Result</a></li>
+  </ul></li>
+  <li><a href="#step-8-variety-normalization-mapping-synonym-merging" id="toc-step-8-variety-normalization-mapping-synonym-merging" class="nav-link" data-scroll-target="#step-8-variety-normalization-mapping-synonym-merging"><span class="header-section-number">3.10</span> Step 8 — Variety Normalization Mapping (Synonym Merging)</a>
+  <ul class="collapse">
+  <li><a href="#purpose-4" id="toc-purpose-4" class="nav-link" data-scroll-target="#purpose-4"><span class="header-section-number">3.10.1</span> Purpose</a></li>
+  <li><a href="#what-we-did-6" id="toc-what-we-did-6" class="nav-link" data-scroll-target="#what-we-did-6"><span class="header-section-number">3.10.2</span> What We Did</a></li>
+  <li><a href="#result-3" id="toc-result-3" class="nav-link" data-scroll-target="#result-3"><span class="header-section-number">3.10.3</span> Result</a></li>
+  </ul></li>
+  <li><a href="#step-9-description-text-cleaning-and-tf-idf-feature-extraction" id="toc-step-9-description-text-cleaning-and-tf-idf-feature-extraction" class="nav-link" data-scroll-target="#step-9-description-text-cleaning-and-tf-idf-feature-extraction"><span class="header-section-number">3.11</span> Step 9 — Description Text Cleaning and TF-IDF Feature Extraction</a>
+  <ul class="collapse">
+  <li><a href="#purpose-5" id="toc-purpose-5" class="nav-link" data-scroll-target="#purpose-5"><span class="header-section-number">3.11.1</span> Purpose</a></li>
+  <li><a href="#what-we-did-7" id="toc-what-we-did-7" class="nav-link" data-scroll-target="#what-we-did-7"><span class="header-section-number">3.11.2</span> What We Did</a></li>
+  <li><a href="#result-4" id="toc-result-4" class="nav-link" data-scroll-target="#result-4"><span class="header-section-number">3.11.3</span> Result</a></li>
+  </ul></li>
+  <li><a href="#step-10-structured-feature-encoding-indexing-one-hot" id="toc-step-10-structured-feature-encoding-indexing-one-hot" class="nav-link" data-scroll-target="#step-10-structured-feature-encoding-indexing-one-hot"><span class="header-section-number">3.12</span> Step 10 — Structured Feature Encoding (Indexing / One-Hot)</a>
+  <ul class="collapse">
+  <li><a href="#purpose-6" id="toc-purpose-6" class="nav-link" data-scroll-target="#purpose-6"><span class="header-section-number">3.12.1</span> Purpose</a></li>
+  <li><a href="#what-we-did-8" id="toc-what-we-did-8" class="nav-link" data-scroll-target="#what-we-did-8"><span class="header-section-number">3.12.2</span> What We Did</a></li>
+  </ul></li>
+  <li><a href="#step-11-persistence-and-output" id="toc-step-11-persistence-and-output" class="nav-link" data-scroll-target="#step-11-persistence-and-output"><span class="header-section-number">3.13</span> Step 11 — Persistence and Output</a>
+  <ul class="collapse">
+  <li><a href="#purpose-7" id="toc-purpose-7" class="nav-link" data-scroll-target="#purpose-7"><span class="header-section-number">3.13.1</span> Purpose</a></li>
+  <li><a href="#what-we-did-9" id="toc-what-we-did-9" class="nav-link" data-scroll-target="#what-we-did-9"><span class="header-section-number">3.13.2</span> What We Did</a></li>
+  <li><a href="#result-5" id="toc-result-5" class="nav-link" data-scroll-target="#result-5"><span class="header-section-number">3.13.3</span> Result</a></li>
+  </ul></li>
+  <li><a href="#step-12-quick-sanity-check-eda" id="toc-step-12-quick-sanity-check-eda" class="nav-link" data-scroll-target="#step-12-quick-sanity-check-eda"><span class="header-section-number">3.14</span> Step 12 — Quick Sanity Check / EDA</a>
+  <ul class="collapse">
+  <li><a href="#purpose-8" id="toc-purpose-8" class="nav-link" data-scroll-target="#purpose-8"><span class="header-section-number">3.14.1</span> Purpose</a></li>
+  <li><a href="#what-we-did-10" id="toc-what-we-did-10" class="nav-link" data-scroll-target="#what-we-did-10"><span class="header-section-number">3.14.2</span> What We Did</a></li>
+  <li><a href="#result-6" id="toc-result-6" class="nav-link" data-scroll-target="#result-6"><span class="header-section-number">3.14.3</span> Result</a></li>
+  </ul></li>
+  <li><a href="#step-13-appendix-how-to-reuse-the-same-preprocessing-pipeline-on-new-data" id="toc-step-13-appendix-how-to-reuse-the-same-preprocessing-pipeline-on-new-data" class="nav-link" data-scroll-target="#step-13-appendix-how-to-reuse-the-same-preprocessing-pipeline-on-new-data"><span class="header-section-number">3.15</span> Step 13 — Appendix: How to Reuse the Same Preprocessing Pipeline on New Data</a>
+  <ul class="collapse">
+  <li><a href="#purpose-9" id="toc-purpose-9" class="nav-link" data-scroll-target="#purpose-9"><span class="header-section-number">3.15.1</span> Purpose</a></li>
+  <li><a href="#what-we-did-11" id="toc-what-we-did-11" class="nav-link" data-scroll-target="#what-we-did-11"><span class="header-section-number">3.15.2</span> What We Did</a></li>
+  <li><a href="#result-7" id="toc-result-7" class="nav-link" data-scroll-target="#result-7"><span class="header-section-number">3.15.3</span> Result</a></li>
+  </ul></li>
+  <li><a href="#step-14-spark.stop" id="toc-step-14-spark.stop" class="nav-link" data-scroll-target="#step-14-spark.stop"><span class="header-section-number">3.16</span> Step 14 : spark.stop()</a></li>
+  <li><a href="#future-ml-tasks-and-analysis" id="toc-future-ml-tasks-and-analysis" class="nav-link" data-scroll-target="#future-ml-tasks-and-analysis"><span class="header-section-number">3.17</span> Future ML Tasks and analysis</a>
+  <ul class="collapse">
+  <li><a href="#price-prediction-regression" id="toc-price-prediction-regression" class="nav-link" data-scroll-target="#price-prediction-regression"><span class="header-section-number">3.17.1</span> <strong>1. Price Prediction (Regression)</strong></a></li>
+  <li><a href="#variety-classification-multiclass" id="toc-variety-classification-multiclass" class="nav-link" data-scroll-target="#variety-classification-multiclass"><span class="header-section-number">3.17.2</span> <strong>2. Variety Classification (Multiclass)</strong></a></li>
+  <li><a href="#country-of-origin-prediction-classification" id="toc-country-of-origin-prediction-classification" class="nav-link" data-scroll-target="#country-of-origin-prediction-classification"><span class="header-section-number">3.17.3</span> <strong>3. Country of Origin Prediction (Classification)</strong></a></li>
+  </ul></li>
+  </ul></li>
+  </ul>
+<div class="quarto-alternate-formats"><h2>Other Formats</h2><ul><li><a href="wine_preprocessing_report.qmd.pdf"><i class="bi bi-file-pdf"></i>PDF</a></li></ul></div></nav>
+</div>
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">WineEnthusiast Preprocessing Report</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    <div>
+    <div class="quarto-title-meta-heading">Author</div>
+    <div class="quarto-title-meta-contents">
+             <p>Ce Liang </p>
+          </div>
+  </div>
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<section id="introduction" class="level1" data-number="1">
+<h1 data-number="1"><span class="header-section-number">1</span> Introduction</h1>
+<p>This report explains, step by step, how I cleaned and featurized the <strong>Kaggle WineEnthusiast</strong> dataset using PySpark in the notebook <code>wine_preprocessing_pyspark_c</code>.</p>
+<p>For each stage I describe:</p>
+<ul>
+<li><strong>Motivation</strong> – why this step is needed.</li>
+<li><strong>What we did</strong> – the main operations and code ideas.</li>
+<li><strong>Result</strong> – how the dataset changed, and what artifacts were produced.</li>
+</ul>
+<p>The final goal of this pipeline is to generate:</p>
+<ul>
+<li>a <strong>clean, standardized base dataset</strong> for exploration; and<br>
+</li>
+<li>an <strong>ML-ready dataset</strong> with a single <code>features</code> vector that combines numeric, categorical, and text information, so that we can directly plug it into regression, classification, or clustering models.</li>
+</ul>
+</section>
+<section id="dataset" class="level1" data-number="2">
+<h1 data-number="2"><span class="header-section-number">2</span> Dataset</h1>
+<section id="raw-data" class="level2" data-number="2.1">
+<h2 data-number="2.1" class="anchored" data-anchor-id="raw-data"><span class="header-section-number">2.1</span> Raw data</h2>
+<ul>
+<li><strong>Source</strong>: Kaggle WineEnthusiast ratings dataset.</li>
+<li><strong>Original size</strong>: about 130k rows.</li>
+<li><strong>Key columns</strong>:<br>
+<code>country, description, designation, points, price, province, region_1, region_2, taster_name, taster_twitter_handle, title, variety, winery</code>.</li>
+</ul>
+</section>
+<section id="motivation" class="level2" data-number="2.2">
+<h2 data-number="2.2" class="anchored" data-anchor-id="motivation"><span class="header-section-number">2.2</span> Motivation</h2>
+<p>We treat the Kaggle export as the <strong>only raw input</strong>.<br>
+All downstream artifacts (clean data, features, ML models) must be reproducible from this single CSV file plus the PySpark notebook.</p>
+<hr>
+</section>
+</section>
+<section id="step-1-spark-session-configuration" class="level1" data-number="3">
+<h1 data-number="3"><span class="header-section-number">3</span> Step 1 — Spark session &amp; configuration</h1>
+<section id="motivation-1" class="level2" data-number="3.1">
+<h2 data-number="3.1" class="anchored" data-anchor-id="motivation-1"><span class="header-section-number">3.1</span> Motivation</h2>
+<p>The full dataset is reasonably large and we want to be able to scale to larger data in the future.<br>
+So I run everything in <strong>PySpark</strong> instead of pandas. That also matches the DS 410 “big data / scalable analytics” theme.</p>
+</section>
+<section id="what-we-did" class="level2" data-number="3.2">
+<h2 data-number="3.2" class="anchored" data-anchor-id="what-we-did"><span class="header-section-number">3.2</span> What we did</h2>
+<p>In the notebook I created a Spark session with explicit settings for driver memory and shuffle partitions, for example:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pyspark.sql <span class="im">import</span> SparkSession</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>spark <span class="op">=</span> (</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>    SparkSession.builder</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>    .appName(<span class="st">"wine-preprocessing"</span>)</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>    .config(<span class="st">"spark.driver.memory"</span>, <span class="st">"12g"</span>)</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>    .config(<span class="st">"spark.sql.shuffle.partitions"</span>, <span class="st">"200"</span>)</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>    .getOrCreate()</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>These settings are tuned for my environment but can be overridden when running on a cluster.</p>
+</section>
+<section id="result" class="level2" data-number="3.3">
+<h2 data-number="3.3" class="anchored" data-anchor-id="result"><span class="header-section-number">3.3</span> Result</h2>
+<p>A configured SparkSession that is reused in all later steps. The same notebook can run on local mode (local[4]) or on a remote Spark cluster without code changes.</p>
+</section>
+<section id="step-2-loading-the-raw-csv-and-quick-inspection" class="level2" data-number="3.4">
+<h2 data-number="3.4" class="anchored" data-anchor-id="step-2-loading-the-raw-csv-and-quick-inspection"><span class="header-section-number">3.4</span> Step 2 — Loading the Raw CSV and Quick Inspection</h2>
+<p>setting default paths</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pathlib</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>DEFAULT_PATHS <span class="op">=</span> [</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>    <span class="st">"data/winemag-data-130k-v2.csv"</span>,</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>    <span class="st">"winemag-data-130k-v2.csv"</span>,</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>    <span class="st">"data/winemag-data_first150k.csv"</span>,</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>    <span class="st">"winemag-data_first150k.csv"</span>,</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>    <span class="co"># try at same time：</span></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>    <span class="st">"/mnt/data/winemag-data-130k-v2.csv"</span>,</span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>    <span class="st">"/mnt/data/winemag-data_first150k.csv"</span>,</span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>]</span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>input_path <span class="op">=</span> os.environ.get(<span class="st">"WINE_CSV_PATH"</span>)</span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> <span class="kw">not</span> input_path:</span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> p <span class="kw">in</span> DEFAULT_PATHS:</span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a>        <span class="cf">if</span> pathlib.Path(p).exists():</span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a>            input_path <span class="op">=</span> p</span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a>            <span class="cf">break</span></span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a><span class="cf">assert</span> input_path <span class="kw">and</span> pathlib.Path(input_path).exists(), (</span>
+<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a>    <span class="st">"didnt find data files，please set env viariable WINE_CSV_PATH or put CSV under ./data/ "</span></span>
+<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a>OUTPUT_DIR <span class="op">=</span> pathlib.Path(<span class="st">"outputs"</span>)</span>
+<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a>OUTPUT_DIR.mkdir(exist_ok<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a>input_path</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+<section id="step-3-read-data-and-perform-initial-inspection-infer-correct-data-types" class="level2" data-number="3.5">
+<h2 data-number="3.5" class="anchored" data-anchor-id="step-3-read-data-and-perform-initial-inspection-infer-correct-data-types"><span class="header-section-number">3.5</span> Step 3 — Read Data and Perform Initial Inspection (Infer / Correct Data Types)</h2>
+<section id="what-we-did-1" class="level3" data-number="3.5.1">
+<h3 data-number="3.5.1" class="anchored" data-anchor-id="what-we-did-1"><span class="header-section-number">3.5.1</span> What We Did</h3>
+<p>In this step, the goal was to load the raw CSV safely, inspect its structure, remove unnecessary columns, and correct data types for downstream analysis. The process included four main actions:</p>
+<hr>
+</section>
+<section id="loading-the-csv-with-spark" class="level3" data-number="3.5.2">
+<h3 data-number="3.5.2" class="anchored" data-anchor-id="loading-the-csv-with-spark"><span class="header-section-number">3.5.2</span> 1. Loading the CSV with Spark</h3>
+<p>We used <code>spark.read.csv()</code> with several important options:</p>
+<ul>
+<li><code>header=True</code>: tells Spark to treat the first row as column names.</li>
+<li><code>multiLine=True</code>: allows records that contain line breaks inside quoted text (common in user-generated descriptions).</li>
+<li><code>escape='"'</code>: allows proper parsing of embedded quotes.</li>
+<li><code>inferSchema=True</code>: automatically infers column data types from the raw file.</li>
+</ul>
+<p>This gives us an initial DataFrame <code>df_raw</code> along with basic metadata (row count and column names).</p>
+<hr>
+</section>
+<section id="removing-useless-or-auto-generated-columns" class="level3" data-number="3.5.3">
+<h3 data-number="3.5.3" class="anchored" data-anchor-id="removing-useless-or-auto-generated-columns"><span class="header-section-number">3.5.3</span> 2. Removing Useless or Auto-Generated Columns</h3>
+<p>Some CSV exports — especially those from Kaggle or Excel — contain extra columns such as:</p>
+<ul>
+<li><code>"Unnamed: 0"</code></li>
+<li><code>"_c0"</code></li>
+<li><code>"index"</code></li>
+</ul>
+<p>These are not real variables and are usually accidental index columns.<br>
+Therefore, we looped through a list of known junk names and removed them if they exist.</p>
+<hr>
+</section>
+<section id="fixing-incorrect-data-types" class="level3" data-number="3.5.4">
+<h3 data-number="3.5.4" class="anchored" data-anchor-id="fixing-incorrect-data-types"><span class="header-section-number">3.5.4</span> 3. Fixing Incorrect Data Types</h3>
+<p>Two variables require special attention:</p>
+<section id="a.-points" class="level4" data-number="3.5.4.1">
+<h4 data-number="3.5.4.1" class="anchored" data-anchor-id="a.-points"><span class="header-section-number">3.5.4.1</span> <strong>a. <code>points</code></strong></h4>
+<p>Originally read as string in some CSV versions.<br>
+We explicitly convert it to integer using:</p>
+<ul>
+<li><code>.cast(IntegerType())</code></li>
+</ul>
+</section>
+<section id="b.-price" class="level4" data-number="3.5.4.2">
+<h4 data-number="3.5.4.2" class="anchored" data-anchor-id="b.-price"><span class="header-section-number">3.5.4.2</span> <strong>b. <code>price</code></strong></h4>
+<p>Some price values contain commas (e.g., <code>"1,200"</code>).<br>
+Spark cannot convert such strings directly into numbers, so we:</p>
+<ol type="1">
+<li>Cast <code>price</code> to string to ensure regex operations can apply<br>
+</li>
+<li>Use <code>regexp_replace</code> to remove commas<br>
+</li>
+<li>Cast the cleaned string into a proper <code>DoubleType</code></li>
+</ol>
+<p>This ensures numerical columns can be analyzed, plotted, and modeled without errors.</p>
+<hr>
+</section>
+</section>
+<section id="previewing-the-cleaned-data" class="level3" data-number="3.5.5">
+<h3 data-number="3.5.5" class="anchored" data-anchor-id="previewing-the-cleaned-data"><span class="header-section-number">3.5.5</span> 4. Previewing the Cleaned Data</h3>
+<p>Finally, we print to make sure:</p>
+<ul>
+<li>The schema (<code>printSchema()</code>), to confirm correct data types<br>
+</li>
+<li>The first five rows (<code>show(5)</code>), to perform a quick sanity check</li>
+</ul>
+<p>This step verifies that our transformations were successful and that the DataFrame <code>df</code> is now ready for further cleaning or exploratory analysis.</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pyspark.sql <span class="im">import</span> functions <span class="im">as</span> F, types <span class="im">as</span> T</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>df_raw <span class="op">=</span> (</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>    spark.read</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>    .option(<span class="st">"header"</span>, <span class="va">True</span>)</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>    .option(<span class="st">"multiLine"</span>, <span class="va">True</span>)</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>    .option(<span class="st">"escape"</span>, <span class="st">'"'</span>)</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>    .csv(input_path, inferSchema<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Raw count:"</span>, df_raw.count())</span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Columns:"</span>, df_raw.columns)</span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a><span class="co"># Kaggle WineEnthusiast：</span></span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>expected_cols <span class="op">=</span> [</span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a>    <span class="st">"country"</span>,<span class="st">"description"</span>,<span class="st">"designation"</span>,<span class="st">"points"</span>,<span class="st">"price"</span>,<span class="st">"province"</span>,</span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a>    <span class="st">"region_1"</span>,<span class="st">"region_2"</span>,<span class="st">"taster_name"</span>,<span class="st">"taster_twitter_handle"</span>,</span>
+<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a>    <span class="st">"title"</span>,<span class="st">"variety"</span>,<span class="st">"winery"</span></span>
+<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a>]</span>
+<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-21"><a href="#cb3-21" aria-hidden="true" tabindex="-1"></a><span class="co"># for ex. 'Unnamed: 0'</span></span>
+<span id="cb3-22"><a href="#cb3-22" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> junk <span class="kw">in</span> [<span class="st">"Unnamed: 0"</span>, <span class="st">"_c0"</span>, <span class="st">"index"</span>]:</span>
+<span id="cb3-23"><a href="#cb3-23" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> junk <span class="kw">in</span> df_raw.columns:</span>
+<span id="cb3-24"><a href="#cb3-24" aria-hidden="true" tabindex="-1"></a>        df_raw <span class="op">=</span> df_raw.drop(junk)</span>
+<span id="cb3-25"><a href="#cb3-25" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-26"><a href="#cb3-26" aria-hidden="true" tabindex="-1"></a><span class="co"># fix type</span></span>
+<span id="cb3-27"><a href="#cb3-27" aria-hidden="true" tabindex="-1"></a>df <span class="op">=</span> (</span>
+<span id="cb3-28"><a href="#cb3-28" aria-hidden="true" tabindex="-1"></a>    df_raw</span>
+<span id="cb3-29"><a href="#cb3-29" aria-hidden="true" tabindex="-1"></a>    .withColumn(<span class="st">"points"</span>, F.col(<span class="st">"points"</span>).cast(T.IntegerType()))</span>
+<span id="cb3-30"><a href="#cb3-30" aria-hidden="true" tabindex="-1"></a>    .withColumn(<span class="st">"price"</span>, F.regexp_replace(F.col(<span class="st">"price"</span>).cast(T.StringType()), <span class="st">","</span>, <span class="st">""</span>))</span>
+<span id="cb3-31"><a href="#cb3-31" aria-hidden="true" tabindex="-1"></a>    .withColumn(<span class="st">"price"</span>, F.col(<span class="st">"price"</span>).cast(T.DoubleType()))</span>
+<span id="cb3-32"><a href="#cb3-32" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb3-33"><a href="#cb3-33" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-34"><a href="#cb3-34" aria-hidden="true" tabindex="-1"></a>df.printSchema()</span>
+<span id="cb3-35"><a href="#cb3-35" aria-hidden="true" tabindex="-1"></a>df.show(<span class="dv">5</span>, truncate<span class="op">=</span><span class="dv">80</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+</section>
+<section id="step-4-quick-data-quality-check" class="level2" data-number="3.6">
+<h2 data-number="3.6" class="anchored" data-anchor-id="step-4-quick-data-quality-check"><span class="header-section-number">3.6</span> Step 4 — Quick Data Quality Check</h2>
+<section id="purpose" class="level3" data-number="3.6.1">
+<h3 data-number="3.6.1" class="anchored" data-anchor-id="purpose"><span class="header-section-number">3.6.1</span> Purpose</h3>
+<p>Before deciding how to clean or model the data, we need a quick overview of which columns contain missing values and how severe the missingness is. This helps us determine: - which variables may need imputation, - which columns might be too sparse to keep, - and where data issues could affect modeling later.</p>
+</section>
+<section id="what-we-did-2" class="level3" data-number="3.6.2">
+<h3 data-number="3.6.2" class="anchored" data-anchor-id="what-we-did-2"><span class="header-section-number">3.6.2</span> What We Did</h3>
+<p>We wrote a small helper function <code>null_report()</code> that: - counts null or empty-string values for each column, - calculates the missingness percentage, - and returns a sorted summary (most missing → least missing).</p>
+<p>Running the function shows: - <code>region_2</code>, <code>designation</code>, and some taster-related fields have high missingness, - core fields like <code>description</code>, <code>variety</code>, and <code>country</code> are largely complete,</p>
+<p><strong>region_2 column contains 79,460 missing values, accounting for 61.14% of the entire dataset</strong></p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pyspark.sql <span class="im">import</span> functions <span class="im">as</span> F</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> null_report(_df):</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>    total <span class="op">=</span> _df.count()</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>    stats <span class="op">=</span> [</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>        F.count(F.when(F.col(c).isNull() <span class="op">|</span> (F.trim(F.col(c)) <span class="op">==</span> <span class="st">""</span>), c)).alias(c)</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>        <span class="cf">for</span> c <span class="kw">in</span> _df.columns</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>    ]</span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>    row <span class="op">=</span> _df.select(<span class="op">*</span>stats).collect()[<span class="dv">0</span>].asDict()</span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="bu">sorted</span>([(k, v, <span class="bu">round</span>(v<span class="op">/</span>total, <span class="dv">4</span>)) <span class="cf">for</span> k, v <span class="kw">in</span> row.items()],</span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>                  key<span class="op">=</span><span class="kw">lambda</span> x: x[<span class="dv">1</span>], reverse<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>null_report(df)[:<span class="dv">10</span>]</span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a><span class="op">&gt;</span>[(<span class="st">'region_2'</span>, <span class="dv">79460</span>, <span class="fl">0.6114</span>),</span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a> (<span class="st">'designation'</span>, <span class="dv">37465</span>, <span class="fl">0.2883</span>),</span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a> (<span class="st">'taster_twitter_handle'</span>, <span class="dv">31213</span>, <span class="fl">0.2402</span>),</span>
+<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a> (<span class="st">'taster_name'</span>, <span class="dv">26244</span>, <span class="fl">0.2019</span>),</span>
+<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a> (<span class="st">'region_1'</span>, <span class="dv">21247</span>, <span class="fl">0.1635</span>),</span>
+<span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a> (<span class="st">'price'</span>, <span class="dv">8996</span>, <span class="fl">0.0692</span>),</span>
+<span id="cb4-21"><a href="#cb4-21" aria-hidden="true" tabindex="-1"></a> (<span class="st">'country'</span>, <span class="dv">63</span>, <span class="fl">0.0005</span>),</span>
+<span id="cb4-22"><a href="#cb4-22" aria-hidden="true" tabindex="-1"></a> (<span class="st">'province'</span>, <span class="dv">63</span>, <span class="fl">0.0005</span>),</span>
+<span id="cb4-23"><a href="#cb4-23" aria-hidden="true" tabindex="-1"></a> (<span class="st">'variety'</span>, <span class="dv">1</span>, <span class="fl">0.0</span>),</span>
+<span id="cb4-24"><a href="#cb4-24" aria-hidden="true" tabindex="-1"></a> (<span class="st">'description'</span>, <span class="dv">0</span>, <span class="fl">0.0</span>)]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+</section>
+<section id="step-5-string-normalization-and-cleaning-functions" class="level2" data-number="3.7">
+<h2 data-number="3.7" class="anchored" data-anchor-id="step-5-string-normalization-and-cleaning-functions"><span class="header-section-number">3.7</span> Step 5 — String Normalization and Cleaning Functions</h2>
+<section id="purpose-1" class="level3" data-number="3.7.1">
+<h3 data-number="3.7.1" class="anchored" data-anchor-id="purpose-1"><span class="header-section-number">3.7.1</span> Purpose</h3>
+<p>Text columns in the raw dataset come from many different sources and often contain inconsistent formatting.<br>
+Before modeling or visualization, we need a standardized version of each text field (norm) so that:</p>
+<ul>
+<li>“US”, “Us”, and “us” are treated as the same category<br>
+</li>
+<li>accented characters (e.g., “São Paulo”) are normalized<br>
+</li>
+<li>extra spaces or irregular formatting do not create false categories<br>
+</li>
+<li>downstream grouping, clustering, and ML models become more reliable</li>
+</ul>
+</section>
+<section id="what-we-did-3" class="level3" data-number="3.7.2">
+<h3 data-number="3.7.2" class="anchored" data-anchor-id="what-we-did-3"><span class="header-section-number">3.7.2</span> What We Did</h3>
+<p>We created a Python-based normalization function that:</p>
+<ol type="1">
+<li>Converts accented characters to ASCII using <strong>Unidecode</strong><br>
+</li>
+<li>Strips leading/trailing spaces<br>
+</li>
+<li>Forces all text to lowercase<br>
+</li>
+<li>Collapses multiple whitespaces into one</li>
+</ol>
+<p>We applied this function to key categorical/text fields such as<br>
+<code>country</code>, <code>province</code>, <code>region_1</code>, <code>region_2</code>, <code>variety</code>, <code>winery</code>, <code>taster_name</code>, etc.<br>
+For safety, we <strong>kept the original columns</strong> and created new ones with the suffix <code>*_norm</code> to compare differences.</p>
+<p>The preview confirms normalization is working as expected.</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> re, unicodedata</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> unidecode <span class="im">import</span> unidecode</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> normalize_text_py(s: <span class="bu">str</span>) <span class="op">-&gt;</span> <span class="bu">str</span>:</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> s <span class="kw">is</span> <span class="va">None</span>:</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="va">None</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>    <span class="co"># ASCII</span></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>    s <span class="op">=</span> unidecode(<span class="bu">str</span>(s))</span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>    s <span class="op">=</span> s.strip().lower()</span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>    s <span class="op">=</span> re.sub(<span class="vs">r"\s+"</span>, <span class="st">" "</span>, s)</span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>    <span class="co"># can add more</span></span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> s</span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>normalize_udf <span class="op">=</span> F.udf(normalize_text_py, T.StringType()) <span class="co">#Register the Python function as a Spark UDF so that the Spark DataFrame can call our custom text-cleaning function</span></span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a><span class="co"># standardize string（keep original，add *_norm for checking）</span></span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true" tabindex="-1"></a>text_cols <span class="op">=</span> [<span class="st">"country"</span>,<span class="st">"province"</span>,<span class="st">"region_1"</span>,<span class="st">"region_2"</span>,<span class="st">"variety"</span>,<span class="st">"winery"</span>,<span class="st">"taster_name"</span>,<span class="st">"designation"</span>,<span class="st">"title"</span>]</span>
+<span id="cb5-18"><a href="#cb5-18" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> c <span class="kw">in</span> text_cols:</span>
+<span id="cb5-19"><a href="#cb5-19" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> c <span class="kw">in</span> df.columns:</span>
+<span id="cb5-20"><a href="#cb5-20" aria-hidden="true" tabindex="-1"></a>        df <span class="op">=</span> df.withColumn(<span class="ss">f"</span><span class="sc">{</span>c<span class="sc">}</span><span class="ss">_norm"</span>, normalize_udf(F.col(c)))</span>
+<span id="cb5-21"><a href="#cb5-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a>df.select([F.col(c) <span class="cf">for</span> c <span class="kw">in</span> df.columns <span class="cf">if</span> c.endswith(<span class="st">"_norm"</span>)]).show(<span class="dv">5</span>, truncate<span class="op">=</span><span class="dv">60</span>)</span>
+<span id="cb5-23"><a href="#cb5-23" aria-hidden="true" tabindex="-1"></a><span class="co"># We create the *_norm columns to have a clean, standardized version for modeling while still preserving the original raw text</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+</section>
+<section id="step-6-deduplication-strategy" class="level2" data-number="3.8">
+<h2 data-number="3.8" class="anchored" data-anchor-id="step-6-deduplication-strategy"><span class="header-section-number">3.8</span> Step 6 — Deduplication Strategy</h2>
+<section id="purpose-2" class="level3" data-number="3.8.1">
+<h3 data-number="3.8.1" class="anchored" data-anchor-id="purpose-2"><span class="header-section-number">3.8.1</span> Purpose</h3>
+<p>Large text-based datasets often contain repeated reviews or near-identical entries.<br>
+To avoid bias in later analyses or ML models, we need a reliable way to detect and remove duplicates—even when the text is slightly different (punctuation, casing, spacing, etc.).</p>
+</section>
+<section id="what-we-did-4" class="level3" data-number="3.8.2">
+<h3 data-number="3.8.2" class="anchored" data-anchor-id="what-we-did-4"><span class="header-section-number">3.8.2</span> What We Did</h3>
+<p>We created a fingerprinting method that identifies duplicates based on meaningful text content rather than row position:</p>
+<ol type="1">
+<li><p><strong>Normalize the review text</strong></p>
+<ul>
+<li>Convert <code>description</code> to lowercase<br>
+</li>
+<li>Remove punctuation and collapse into a simple alphanumeric string<br>
+This captures the core meaning while ignoring formatting noise.</li>
+</ul></li>
+<li><p><strong>Build a combined fingerprint</strong><br>
+We merge three stable fields:</p>
+<ul>
+<li><code>title</code><br>
+</li>
+<li><code>winery</code><br>
+</li>
+<li>normalized description</li>
+</ul>
+<p>Then compute a <strong>SHA-256 hash</strong> (<code>row_fingerprint</code>) from this combination.<br>
+Each unique review should produce a unique hash.</p></li>
+<li><p><strong>Drop duplicates based on the fingerprint</strong><br>
+We remove repeated SHA-256 fingerprints and drop the helper columns afterwards.</p></li>
+</ol>
+</section>
+<section id="result-1" class="level3" data-number="3.8.3">
+<h3 data-number="3.8.3" class="anchored" data-anchor-id="result-1"><span class="header-section-number">3.8.3</span> Result</h3>
+<p>This process removed <strong>9,985 duplicate rows</strong> from the dataset.<br>
+The repeated Spark header warning is the same harmless CSV-header issue noted earlier.</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Step 6 — Deduplication Strategy</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a><span class="co"># 1. Normalize description</span></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>df <span class="op">=</span> df.withColumn(</span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>    <span class="st">"desc_fingerprint"</span>,</span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>    F.lower(F.regexp_replace(F.col(<span class="st">"description"</span>), <span class="vs">r"[^A-Za-z0-9]+"</span>, <span class="st">" "</span>)) <span class="co"># Remove all non-alphanumeric characters and replace them with a space</span></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a><span class="co"># 2. Combine fields and compute SHA-256 fingerprint</span></span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>df <span class="op">=</span> df.withColumn(</span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>    <span class="st">"row_fingerprint"</span>,</span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>    F.sha2(F.concat_ws( <span class="co">#Combine title, winery, and desc_fingerprint and compute a SHA-256 hash</span></span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>        <span class="st">"||"</span>,</span>
+<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a>        F.coalesce(F.col(<span class="st">"title"</span>), F.lit(<span class="st">""</span>)),</span>
+<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a>        F.coalesce(F.col(<span class="st">"winery"</span>), F.lit(<span class="st">""</span>)),</span>
+<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a>        F.coalesce(F.col(<span class="st">"desc_fingerprint"</span>), F.lit(<span class="st">""</span>))</span>
+<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a>    ), <span class="dv">256</span>)</span>
+<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-20"><a href="#cb6-20" aria-hidden="true" tabindex="-1"></a><span class="co"># 3. Deduplicate</span></span>
+<span id="cb6-21"><a href="#cb6-21" aria-hidden="true" tabindex="-1"></a>before <span class="op">=</span> df.count()</span>
+<span id="cb6-22"><a href="#cb6-22" aria-hidden="true" tabindex="-1"></a>df_dedup <span class="op">=</span> (    <span class="co">#Perform deduplication based on the generated hash</span></span>
+<span id="cb6-23"><a href="#cb6-23" aria-hidden="true" tabindex="-1"></a>    df.dropDuplicates([<span class="st">"row_fingerprint"</span>])</span>
+<span id="cb6-24"><a href="#cb6-24" aria-hidden="true" tabindex="-1"></a>      .drop(<span class="st">"row_fingerprint"</span>, <span class="st">"desc_fingerprint"</span>)</span>
+<span id="cb6-25"><a href="#cb6-25" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb6-26"><a href="#cb6-26" aria-hidden="true" tabindex="-1"></a>after <span class="op">=</span> df_dedup.count()</span>
+<span id="cb6-27"><a href="#cb6-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-28"><a href="#cb6-28" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="ss">f"Deduplicated: </span><span class="sc">{</span>before<span class="sc">}</span><span class="ss"> -&gt; </span><span class="sc">{</span>after<span class="sc">}</span><span class="ss"> (removed </span><span class="sc">{</span>before <span class="op">-</span> after<span class="sc">}</span><span class="ss">)"</span>) <span class="co">#Deduplicated: 129971 -&gt; 119986 (removed 9985)</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+</section>
+<section id="step-7-handling-missing-and-abnormal-values" class="level2" data-number="3.9">
+<h2 data-number="3.9" class="anchored" data-anchor-id="step-7-handling-missing-and-abnormal-values"><span class="header-section-number">3.9</span> Step 7 — Handling Missing and Abnormal Values</h2>
+<section id="purpose-3" class="level3" data-number="3.9.1">
+<h3 data-number="3.9.1" class="anchored" data-anchor-id="purpose-3"><span class="header-section-number">3.9.1</span> Purpose</h3>
+<p>To prepare the dataset for modeling, we need a clean and consistent numeric target (price) and reliable text categories.<br>
+This step focuses on: - fixing invalid numeric values, - imputing missing prices, - reducing extreme outliers, - and standardizing empty/invalid text fields.</p>
+<p>These operations improve the stability of statistical summaries, ML models, and visualizations.</p>
+<hr>
+</section>
+<section id="what-we-did-5" class="level3" data-number="3.9.2">
+<h3 data-number="3.9.2" class="anchored" data-anchor-id="what-we-did-5"><span class="header-section-number">3.9.2</span> What We Did</h3>
+<section id="fix-invalid-price-values" class="level4" data-number="3.9.2.1">
+<h4 data-number="3.9.2.1" class="anchored" data-anchor-id="fix-invalid-price-values"><span class="header-section-number">3.9.2.1</span> 1. Fix invalid price values</h4>
+<p>Prices ≤ 0 are not meaningful, so we convert them to NULL.</p>
+</section>
+<section id="clean-text-columns" class="level4" data-number="3.9.2.2">
+<h4 data-number="3.9.2.2" class="anchored" data-anchor-id="clean-text-columns"><span class="header-section-number">3.9.2.2</span> 2. Clean text columns</h4>
+<p>After normalization, empty strings are set to NULL to avoid fake categories.</p>
+</section>
+<section id="median-imputation-of-missing-prices" class="level4" data-number="3.9.2.3">
+<h4 data-number="3.9.2.3" class="anchored" data-anchor-id="median-imputation-of-missing-prices"><span class="header-section-number">3.9.2.3</span> 3. Median imputation of missing prices</h4>
+<p>For rows where price is missing, we fill it using the <strong>median price</strong> within<br>
+<code>country_norm + variety_norm</code>.<br>
+This preserves region-level pricing patterns and avoids bias from global averages.<br>
+(You can later switch to other grouping keys like <code>province_norm + variety_norm</code>.)</p>
+</section>
+<section id="winsorization-to-handle-outliers" class="level4" data-number="3.9.2.4">
+<h4 data-number="3.9.2.4" class="anchored" data-anchor-id="winsorization-to-handle-outliers"><span class="header-section-number">3.9.2.4</span> 4. Winsorization to handle outliers</h4>
+<p>We clip extremely small or large prices using the <strong>1% and 99% quantiles</strong>.<br>
+This keeps the data realistic while preventing a few extreme values from dominating models.</p>
+</section>
+</section>
+<section id="result-2" class="level3" data-number="3.9.3">
+<h3 data-number="3.9.3" class="anchored" data-anchor-id="result-2"><span class="header-section-number">3.9.3</span> Result</h3>
+<p>All rows remain (119,986), but: - invalid prices are corrected, - missing prices are imputed consistently, - text fields are normalized, - and numeric outliers are controlled.</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Step 7 — Handling Missing and Abnormal Values</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>df_clean <span class="op">=</span> df_dedup</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="co"># 1. Mark invalid prices as NULL</span></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>df_clean <span class="op">=</span> df_clean.withColumn(</span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>    <span class="st">"price"</span>,</span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>    F.when(F.col(<span class="st">"price"</span>).isNotNull() <span class="op">&amp;</span> (F.col(<span class="st">"price"</span>) <span class="op">&lt;=</span> <span class="dv">0</span>), <span class="va">None</span>)</span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>     .otherwise(F.col(<span class="st">"price"</span>))</span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a><span class="co"># 2. Convert empty normalized text fields to NULL</span></span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> c <span class="kw">in</span> text_cols:</span>
+<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a>    norm <span class="op">=</span> <span class="ss">f"</span><span class="sc">{</span>c<span class="sc">}</span><span class="ss">_norm"</span></span>
+<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> norm <span class="kw">in</span> df_clean.columns:</span>
+<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a>        df_clean <span class="op">=</span> df_clean.withColumn(</span>
+<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a>            norm,</span>
+<span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a>            F.when(F.trim(F.col(norm)) <span class="op">==</span> <span class="st">""</span>, <span class="va">None</span>)</span>
+<span id="cb7-19"><a href="#cb7-19" aria-hidden="true" tabindex="-1"></a>             .otherwise(F.col(norm))</span>
+<span id="cb7-20"><a href="#cb7-20" aria-hidden="true" tabindex="-1"></a>        )</span>
+<span id="cb7-21"><a href="#cb7-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-22"><a href="#cb7-22" aria-hidden="true" tabindex="-1"></a><span class="co"># 3. Median imputation for price</span></span>
+<span id="cb7-23"><a href="#cb7-23" aria-hidden="true" tabindex="-1"></a>groupby_keys <span class="op">=</span> [c <span class="cf">for</span> c <span class="kw">in</span> [<span class="st">"country_norm"</span>, <span class="st">"variety_norm"</span>] <span class="cf">if</span> c <span class="kw">in</span> df_clean.columns]</span>
+<span id="cb7-24"><a href="#cb7-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-25"><a href="#cb7-25" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> groupby_keys:</span>
+<span id="cb7-26"><a href="#cb7-26" aria-hidden="true" tabindex="-1"></a>    med <span class="op">=</span> (</span>
+<span id="cb7-27"><a href="#cb7-27" aria-hidden="true" tabindex="-1"></a>        df_clean.groupBy(<span class="op">*</span>groupby_keys)</span>
+<span id="cb7-28"><a href="#cb7-28" aria-hidden="true" tabindex="-1"></a>        .agg(F.expr(<span class="st">"percentile_approx(price, 0.5)"</span>).alias(<span class="st">"med_price"</span>))</span>
+<span id="cb7-29"><a href="#cb7-29" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb7-30"><a href="#cb7-30" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-31"><a href="#cb7-31" aria-hidden="true" tabindex="-1"></a>    df_clean <span class="op">=</span> (</span>
+<span id="cb7-32"><a href="#cb7-32" aria-hidden="true" tabindex="-1"></a>        df_clean.join(med, on<span class="op">=</span>groupby_keys, how<span class="op">=</span><span class="st">"left"</span>)</span>
+<span id="cb7-33"><a href="#cb7-33" aria-hidden="true" tabindex="-1"></a>        .withColumn(</span>
+<span id="cb7-34"><a href="#cb7-34" aria-hidden="true" tabindex="-1"></a>            <span class="st">"price_imputed"</span>,</span>
+<span id="cb7-35"><a href="#cb7-35" aria-hidden="true" tabindex="-1"></a>            F.when(F.col(<span class="st">"price"</span>).isNull(), F.col(<span class="st">"med_price"</span>))</span>
+<span id="cb7-36"><a href="#cb7-36" aria-hidden="true" tabindex="-1"></a>             .otherwise(F.col(<span class="st">"price"</span>))</span>
+<span id="cb7-37"><a href="#cb7-37" aria-hidden="true" tabindex="-1"></a>        )</span>
+<span id="cb7-38"><a href="#cb7-38" aria-hidden="true" tabindex="-1"></a>        .drop(<span class="st">"med_price"</span>)</span>
+<span id="cb7-39"><a href="#cb7-39" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb7-40"><a href="#cb7-40" aria-hidden="true" tabindex="-1"></a><span class="cf">else</span>:</span>
+<span id="cb7-41"><a href="#cb7-41" aria-hidden="true" tabindex="-1"></a>    df_clean <span class="op">=</span> df_clean.withColumn(<span class="st">"price_imputed"</span>, F.col(<span class="st">"price"</span>))</span>
+<span id="cb7-42"><a href="#cb7-42" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-43"><a href="#cb7-43" aria-hidden="true" tabindex="-1"></a><span class="co"># 4. Winsorization (1%–99%)</span></span>
+<span id="cb7-44"><a href="#cb7-44" aria-hidden="true" tabindex="-1"></a>q <span class="op">=</span> df_clean.approxQuantile(<span class="st">"price_imputed"</span>, [<span class="fl">0.01</span>, <span class="fl">0.99</span>], <span class="fl">0.01</span>)</span>
+<span id="cb7-45"><a href="#cb7-45" aria-hidden="true" tabindex="-1"></a>lower, upper <span class="op">=</span> (q <span class="op">+</span> [<span class="va">None</span>, <span class="va">None</span>])[:<span class="dv">2</span>]</span>
+<span id="cb7-46"><a href="#cb7-46" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-47"><a href="#cb7-47" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> lower <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span> <span class="kw">and</span> upper <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>:</span>
+<span id="cb7-48"><a href="#cb7-48" aria-hidden="true" tabindex="-1"></a>    df_clean <span class="op">=</span> df_clean.withColumn(</span>
+<span id="cb7-49"><a href="#cb7-49" aria-hidden="true" tabindex="-1"></a>        <span class="st">"price_winsor"</span>,</span>
+<span id="cb7-50"><a href="#cb7-50" aria-hidden="true" tabindex="-1"></a>        F.when(F.col(<span class="st">"price_imputed"</span>) <span class="op">&lt;</span> lower, F.lit(lower))</span>
+<span id="cb7-51"><a href="#cb7-51" aria-hidden="true" tabindex="-1"></a>         .when(F.col(<span class="st">"price_imputed"</span>) <span class="op">&gt;</span> upper, F.lit(upper))</span>
+<span id="cb7-52"><a href="#cb7-52" aria-hidden="true" tabindex="-1"></a>         .otherwise(F.col(<span class="st">"price_imputed"</span>))</span>
+<span id="cb7-53"><a href="#cb7-53" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb7-54"><a href="#cb7-54" aria-hidden="true" tabindex="-1"></a><span class="cf">else</span>:</span>
+<span id="cb7-55"><a href="#cb7-55" aria-hidden="true" tabindex="-1"></a>    df_clean <span class="op">=</span> df_clean.withColumn(<span class="st">"price_winsor"</span>, F.col(<span class="st">"price_imputed"</span>))</span>
+<span id="cb7-56"><a href="#cb7-56" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-57"><a href="#cb7-57" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(<span class="st">"Rows after cleaning:"</span>, df_clean.count())</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</section>
+</section>
+<section id="step-8-variety-normalization-mapping-synonym-merging" class="level2" data-number="3.10">
+<h2 data-number="3.10" class="anchored" data-anchor-id="step-8-variety-normalization-mapping-synonym-merging"><span class="header-section-number">3.10</span> Step 8 — Variety Normalization Mapping (Synonym Merging)</h2>
+<section id="purpose-4" class="level3" data-number="3.10.1">
+<h3 data-number="3.10.1" class="anchored" data-anchor-id="purpose-4"><span class="header-section-number">3.10.1</span> Purpose</h3>
+<p>Different wine regions often use different names for the same grape variety<br>
+(e.g., “pinot gris” vs.&nbsp;“pinot grigio,” “shiraz” vs.&nbsp;“syrah”).<br>
+If we do not unify these synonyms, analysis and modeling will treat them as separate categories.<br>
+This step ensures that varieties referring to the same grape are merged into a single canonical label.</p>
+</section>
+<section id="what-we-did-6" class="level3" data-number="3.10.2">
+<h3 data-number="3.10.2" class="anchored" data-anchor-id="what-we-did-6"><span class="header-section-number">3.10.2</span> What We Did</h3>
+<ol type="1">
+<li><strong>Built a mapping table</strong> (<code>VARIETY_MAP</code>)
+<ul>
+<li>Each canonical grape variety lists its known aliases.<br>
+</li>
+<li>The mapping is extensible and can be expanded later.</li>
+</ul></li>
+<li><strong>Created a reverse lookup</strong>
+<ul>
+<li>All aliases → canonical form<br>
+</li>
+<li>Broadcast to all Spark workers for efficient UDF lookup.</li>
+</ul></li>
+<li><strong>Applied a UDF to normalize grape varieties</strong>
+<ul>
+<li>If a variety is an alias, convert it to the canonical name.<br>
+</li>
+<li>Mild rule: remove trailing “blend” where applicable.<br>
+</li>
+<li>Output stored in a new field: <code>variety_canonical</code>.</li>
+</ul></li>
+</ol>
+</section>
+<section id="result-3" class="level3" data-number="3.10.3">
+<h3 data-number="3.10.3" class="anchored" data-anchor-id="result-3"><span class="header-section-number">3.10.3</span> Result</h3>
+<p>The dataset now contains a standardized grape variety field, reducing category fragmentation and improving the reliability of later clustering, visualization, and ML tasks.</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pyspark.sql <span class="im">import</span> Row</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>VARIETY_MAP <span class="op">=</span> { <span class="co"># create variety map</span></span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>    <span class="st">"cabernet sauvignon"</span>: [<span class="st">"cabernet sauv."</span>, <span class="st">"cab sauv"</span>, <span class="st">"cabernet"</span>],</span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>    <span class="st">"sauvignon blanc"</span>: [<span class="st">"sauv. blanc"</span>],</span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>    <span class="st">"pinot noir"</span>: [<span class="st">"spatburgunder"</span>],  <span class="co"># German variant (after unidecode → spatburgunder)</span></span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>    <span class="st">"pinot grigio"</span>: [<span class="st">"pinot gris"</span>],</span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>    <span class="st">"syrah"</span>: [<span class="st">"shiraz"</span>],</span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a>    <span class="st">"grenache"</span>: [<span class="st">"garnacha"</span>],</span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a>    <span class="st">"tempranillo"</span>: [],</span>
+<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a>    <span class="st">"nebbiolo"</span>: [],</span>
+<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a>    <span class="st">"chardonnay"</span>: [],</span>
+<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a>    <span class="st">"riesling"</span>: [],</span>
+<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a>    <span class="st">"merlot"</span>: [],</span>
+<span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a>    <span class="st">"malbec"</span>: [],</span>
+<span id="cb8-17"><a href="#cb8-17" aria-hidden="true" tabindex="-1"></a>    <span class="st">"sangiovese"</span>: [],</span>
+<span id="cb8-18"><a href="#cb8-18" aria-hidden="true" tabindex="-1"></a>    <span class="st">"chenin blanc"</span>: [<span class="st">"steen"</span>],</span>
+<span id="cb8-19"><a href="#cb8-19" aria-hidden="true" tabindex="-1"></a>    <span class="st">"viognier"</span>: [],</span>
+<span id="cb8-20"><a href="#cb8-20" aria-hidden="true" tabindex="-1"></a>    <span class="st">"gamay"</span>: [],</span>
+<span id="cb8-21"><a href="#cb8-21" aria-hidden="true" tabindex="-1"></a>    <span class="st">"gruner veltliner"</span>: [<span class="st">"gruener veltliner"</span>, <span class="st">"gruner veltliner"</span>],</span>
+<span id="cb8-22"><a href="#cb8-22" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb8-23"><a href="#cb8-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-24"><a href="#cb8-24" aria-hidden="true" tabindex="-1"></a><span class="co"># reverse lookup: alias -&gt; canonical</span></span>
+<span id="cb8-25"><a href="#cb8-25" aria-hidden="true" tabindex="-1"></a>alias_to_canonical <span class="op">=</span> {}</span>
+<span id="cb8-26"><a href="#cb8-26" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> canon, aliases <span class="kw">in</span> VARIETY_MAP.items():</span>
+<span id="cb8-27"><a href="#cb8-27" aria-hidden="true" tabindex="-1"></a>    alias_to_canonical[canon] <span class="op">=</span> canon</span>
+<span id="cb8-28"><a href="#cb8-28" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> a <span class="kw">in</span> aliases:</span>
+<span id="cb8-29"><a href="#cb8-29" aria-hidden="true" tabindex="-1"></a>        alias_to_canonical[a] <span class="op">=</span> canon</span>
+<span id="cb8-30"><a href="#cb8-30" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-31"><a href="#cb8-31" aria-hidden="true" tabindex="-1"></a>broadcast_map <span class="op">=</span> spark.sparkContext.broadcast(alias_to_canonical)</span>
+<span id="cb8-32"><a href="#cb8-32" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-33"><a href="#cb8-33" aria-hidden="true" tabindex="-1"></a><span class="at">@F.udf</span>(T.StringType()) <span class="co"># define UDF process:variety_norm → variety_canonical</span></span>
+<span id="cb8-34"><a href="#cb8-34" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> map_variety_norm(v):</span>
+<span id="cb8-35"><a href="#cb8-35" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> v <span class="kw">is</span> <span class="va">None</span>:</span>
+<span id="cb8-36"><a href="#cb8-36" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> <span class="va">None</span></span>
+<span id="cb8-37"><a href="#cb8-37" aria-hidden="true" tabindex="-1"></a>    v <span class="op">=</span> v.strip().lower()</span>
+<span id="cb8-38"><a href="#cb8-38" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> v <span class="kw">in</span> broadcast_map.value:</span>
+<span id="cb8-39"><a href="#cb8-39" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> broadcast_map.value[v]</span>
+<span id="cb8-40"><a href="#cb8-40" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> v.endswith(<span class="st">" blend"</span>):</span>
+<span id="cb8-41"><a href="#cb8-41" aria-hidden="true" tabindex="-1"></a>        <span class="cf">return</span> v.replace(<span class="st">" blend"</span>, <span class="st">""</span>).strip()</span>
+<span id="cb8-42"><a href="#cb8-42" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> v</span>
+<span id="cb8-43"><a href="#cb8-43" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-44"><a href="#cb8-44" aria-hidden="true" tabindex="-1"></a><span class="co"># add canonical variety</span></span>
+<span id="cb8-45"><a href="#cb8-45" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> <span class="st">"variety_norm"</span> <span class="kw">in</span> df_clean.columns:</span>
+<span id="cb8-46"><a href="#cb8-46" aria-hidden="true" tabindex="-1"></a>    df_clean <span class="op">=</span> df_clean.withColumn(<span class="st">"variety_canonical"</span>, map_variety_norm(F.col(<span class="st">"variety_norm"</span>)))</span>
+<span id="cb8-47"><a href="#cb8-47" aria-hidden="true" tabindex="-1"></a><span class="cf">else</span>:</span>
+<span id="cb8-48"><a href="#cb8-48" aria-hidden="true" tabindex="-1"></a>    df_clean <span class="op">=</span> df_clean.withColumn(<span class="st">"variety_canonical"</span>, F.col(<span class="st">"variety"</span>))</span>
+<span id="cb8-49"><a href="#cb8-49" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-50"><a href="#cb8-50" aria-hidden="true" tabindex="-1"></a>df_clean.select(<span class="st">"variety"</span>,<span class="st">"variety_norm"</span>,<span class="st">"variety_canonical"</span>).show(<span class="dv">8</span>, truncate<span class="op">=</span><span class="dv">30</span>)</span>
+<span id="cb8-51"><a href="#cb8-51" aria-hidden="true" tabindex="-1"></a><span class="op">+------------------+------------------+------------------+</span></span>
+<span id="cb8-52"><a href="#cb8-52" aria-hidden="true" tabindex="-1"></a><span class="op">|</span>           variety<span class="op">|</span>      variety_norm<span class="op">|</span> variety_canonical<span class="op">|</span></span>
+<span id="cb8-53"><a href="#cb8-53" aria-hidden="true" tabindex="-1"></a><span class="op">+------------------+------------------+------------------+</span></span>
+<span id="cb8-54"><a href="#cb8-54" aria-hidden="true" tabindex="-1"></a><span class="op">|</span>              Rosé<span class="op">|</span>              rose<span class="op">|</span>              rose<span class="op">|</span></span>
+<span id="cb8-55"><a href="#cb8-55" aria-hidden="true" tabindex="-1"></a><span class="op">|</span>         Zinfandel<span class="op">|</span>         zinfandel<span class="op">|</span>         zinfandel<span class="op">|</span></span>
+<span id="cb8-56"><a href="#cb8-56" aria-hidden="true" tabindex="-1"></a><span class="op">|</span>        Pinot Noir<span class="op">|</span>        pinot noir<span class="op">|</span>        pinot noir<span class="op">|</span></span>
+<span id="cb8-57"><a href="#cb8-57" aria-hidden="true" tabindex="-1"></a><span class="op">|</span>        Pinot Noir<span class="op">|</span>        pinot noir<span class="op">|</span>        pinot noir<span class="op">|</span></span>
+<span id="cb8-58"><a href="#cb8-58" aria-hidden="true" tabindex="-1"></a><span class="op">|</span>   Sauvignon Blanc<span class="op">|</span>   sauvignon blanc<span class="op">|</span>   sauvignon blanc<span class="op">|</span></span>
+<span id="cb8-59"><a href="#cb8-59" aria-hidden="true" tabindex="-1"></a><span class="op">|</span>        Chardonnay<span class="op">|</span>        chardonnay<span class="op">|</span>        chardonnay<span class="op">|</span></span>
+<span id="cb8-60"><a href="#cb8-60" aria-hidden="true" tabindex="-1"></a><span class="op">|</span>        Chardonnay<span class="op">|</span>        chardonnay<span class="op">|</span>        chardonnay<span class="op">|</span></span>
+<span id="cb8-61"><a href="#cb8-61" aria-hidden="true" tabindex="-1"></a><span class="op">|</span>Cabernet Sauvignon<span class="op">|</span>cabernet sauvignon<span class="op">|</span>cabernet sauvignon<span class="op">|</span></span>
+<span id="cb8-62"><a href="#cb8-62" aria-hidden="true" tabindex="-1"></a><span class="op">+------------------+------------------+------------------+</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p><strong>The final cleaned and standardized variety field used for modeling and analysis is the variety_canonical column</strong></p>
+</section>
+</section>
+<section id="step-9-description-text-cleaning-and-tf-idf-feature-extraction" class="level2" data-number="3.11">
+<h2 data-number="3.11" class="anchored" data-anchor-id="step-9-description-text-cleaning-and-tf-idf-feature-extraction"><span class="header-section-number">3.11</span> Step 9 — Description Text Cleaning and TF-IDF Feature Extraction</h2>
+<section id="purpose-5" class="level3" data-number="3.11.1">
+<h3 data-number="3.11.1" class="anchored" data-anchor-id="purpose-5"><span class="header-section-number">3.11.1</span> Purpose</h3>
+<p>The wine description is the richest unstructured field in the dataset.<br>
+To use it for clustering, similarity search, or ML models, we need to convert the raw text into numerical features.<br>
+TF-IDF is a scalable and standard method in Spark to represent text meaning while down-weighting common words.</p>
+</section>
+<section id="what-we-did-7" class="level3" data-number="3.11.2">
+<h3 data-number="3.11.2" class="anchored" data-anchor-id="what-we-did-7"><span class="header-section-number">3.11.2</span> What We Did</h3>
+<ol type="1">
+<li><p><strong>Clean the description text</strong></p>
+<ul>
+<li>Convert to lowercase<br>
+</li>
+<li>Remove non-English characters<br>
+This creates a consistent text field for tokenization.</li>
+</ul></li>
+<li><p><strong>Tokenize the text</strong><br>
+Using <code>RegexTokenizer</code> to split descriptions into word tokens.</p></li>
+<li><p><strong>Remove stopwords</strong><br>
+Using <code>StopWordsRemover</code> to eliminate words that carry little semantic meaning.</p></li>
+<li><p><strong>Convert tokens to term frequencies</strong><br>
+Using <code>CountVectorizer</code> to build a sparse TF matrix.<br>
+<code>minDF</code> ensures we only keep meaningful terms across the corpus.</p></li>
+<li><p><strong>Compute TF-IDF vectors</strong><br>
+Using <code>IDF</code>, producing the final numeric representation in column <code>tfidf</code>.</p></li>
+<li><p><strong>Optional sampling</strong><br>
+To avoid memory pressure during debugging, the pipeline supports<br>
+<code>SAMPLE_FRACTION &lt; 1.0</code> via environment variable.</p></li>
+</ol>
+</section>
+<section id="result-4" class="level3" data-number="3.11.3">
+<h3 data-number="3.11.3" class="anchored" data-anchor-id="result-4"><span class="header-section-number">3.11.3</span> Result</h3>
+<p>Each wine review now has a sparse TF-IDF vector capturing key descriptive terms.<br>
+These features are immediately usable for: - clustering wines by tasting profile,<br>
+- building recommendation systems,<br>
+- classifying wine varieties,<br>
+- or exploratory text analysis.</p>
+<div class="sourceCode" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Step 9 — Text Cleaning and TF-IDF</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pyspark.ml <span class="im">import</span> Pipeline</span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pyspark.ml.feature <span class="im">import</span> RegexTokenizer, StopWordsRemover, CountVectorizer, IDF</span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a><span class="co"># optional sampling (for debugging, 0.1 -&gt; 1)</span></span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>SAMPLE_FRACTION <span class="op">=</span> <span class="bu">float</span>(os.environ.get(<span class="st">"SAMPLE_FRACTION"</span>, <span class="st">"1.0"</span>))</span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>df_text <span class="op">=</span> df_clean</span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> SAMPLE_FRACTION <span class="op">&lt;</span> <span class="fl">1.0</span>:</span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>    df_text <span class="op">=</span> df_text.sample(<span class="va">False</span>, SAMPLE_FRACTION, seed<span class="op">=</span><span class="dv">42</span>)</span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a><span class="co"># clean description text</span></span>
+<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a>df_text <span class="op">=</span> df_text.withColumn(</span>
+<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a>    <span class="st">"description_clean"</span>,</span>
+<span id="cb9-16"><a href="#cb9-16" aria-hidden="true" tabindex="-1"></a>    F.lower(F.regexp_replace(F.col(<span class="st">"description"</span>), <span class="vs">r"[^A-Za-z\s]+"</span>, <span class="st">" "</span>))</span>
+<span id="cb9-17"><a href="#cb9-17" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb9-18"><a href="#cb9-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-19"><a href="#cb9-19" aria-hidden="true" tabindex="-1"></a>tokenizer <span class="op">=</span> RegexTokenizer(inputCol<span class="op">=</span><span class="st">"description_clean"</span>, outputCol<span class="op">=</span><span class="st">"tokens_raw"</span>, pattern<span class="op">=</span><span class="st">"\W+"</span>) <span class="co"># "rich blackberry aroma" → ["rich", "blackberry", "aroma"]</span></span>
+<span id="cb9-20"><a href="#cb9-20" aria-hidden="true" tabindex="-1"></a>remover <span class="op">=</span> StopWordsRemover(inputCol<span class="op">=</span><span class="st">"tokens_raw"</span>, outputCol<span class="op">=</span><span class="st">"tokens"</span>) <span class="co"># rm something like "the" "and" "with" "this" words.</span></span>
+<span id="cb9-21"><a href="#cb9-21" aria-hidden="true" tabindex="-1"></a>cv <span class="op">=</span> CountVectorizer(inputCol<span class="op">=</span><span class="st">"tokens"</span>, outputCol<span class="op">=</span><span class="st">"tf"</span>, minDF<span class="op">=</span><span class="dv">10</span>) <span class="co"># Term Frequency</span></span>
+<span id="cb9-22"><a href="#cb9-22" aria-hidden="true" tabindex="-1"></a>idf <span class="op">=</span> IDF(inputCol<span class="op">=</span><span class="st">"tf"</span>, outputCol<span class="op">=</span><span class="st">"tfidf"</span>, minDocFreq<span class="op">=</span><span class="dv">10</span>) <span class="co"># Inverse Document Frequency</span></span>
+<span id="cb9-23"><a href="#cb9-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-24"><a href="#cb9-24" aria-hidden="true" tabindex="-1"></a>text_pipe <span class="op">=</span> Pipeline(stages<span class="op">=</span>[tokenizer, remover, cv, idf])</span>
+<span id="cb9-25"><a href="#cb9-25" aria-hidden="true" tabindex="-1"></a>text_model <span class="op">=</span> text_pipe.fit(df_text) </span>
+<span id="cb9-26"><a href="#cb9-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-27"><a href="#cb9-27" aria-hidden="true" tabindex="-1"></a>df_text_feats <span class="op">=</span> text_model.transform(df_text)</span>
+<span id="cb9-28"><a href="#cb9-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-29"><a href="#cb9-29" aria-hidden="true" tabindex="-1"></a>df_text_feats.select(<span class="st">"description"</span>, <span class="st">"tokens"</span>).show(<span class="dv">5</span>, truncate<span class="op">=</span><span class="dv">80</span>)</span>
+<span id="cb9-30"><a href="#cb9-30" aria-hidden="true" tabindex="-1"></a><span class="op">+--------------------------------------------------------------------------------+--------------------------------------------------------------------------------+</span></span>
+<span id="cb9-31"><a href="#cb9-31" aria-hidden="true" tabindex="-1"></a><span class="op">|</span>                                                                     description<span class="op">|</span>                                                                          tokens<span class="op">|</span></span>
+<span id="cb9-32"><a href="#cb9-32" aria-hidden="true" tabindex="-1"></a><span class="op">+--------------------------------------------------------------------------------+--------------------------------------------------------------------------------+</span></span>
+<span id="cb9-33"><a href="#cb9-33" aria-hidden="true" tabindex="-1"></a><span class="op">|</span>In its Provence skittle bottle, this wine <span class="kw">is</span> a bright mouthful that <span class="kw">is</span> <span class="im">as</span> eas...<span class="op">|</span>[provence, skittle, bottle, wine, bright, mouthful, easy, palate, pale, color...<span class="op">|</span></span>
+<span id="cb9-34"><a href="#cb9-34" aria-hidden="true" tabindex="-1"></a><span class="op">|</span>Thick <span class="kw">and</span> rich, <span class="cf">with</span> a menthol<span class="op">-</span>like streak <span class="kw">in</span> the background, this <span class="dv">89</span><span class="op">%</span> Zin <span class="kw">is</span>...<span class="op">|</span>[thick, rich, menthol, like, streak, background, zin, complemented, wealth, m...<span class="op">|</span></span>
+<span id="cb9-35"><a href="#cb9-35" aria-hidden="true" tabindex="-1"></a><span class="op">|</span>The fragrant mix of flowers <span class="kw">and</span> fruit introduces a wine already moving into s...<span class="op">|</span>[fragrant, mix, flowers, fruit, introduces, wine, already, moving, secondary,...<span class="op">|</span></span>
+<span id="cb9-36"><a href="#cb9-36" aria-hidden="true" tabindex="-1"></a><span class="op">|</span>There are a lot of intriguing <span class="kw">and</span> unique aromas on the nose of this bottling,...<span class="op">|</span>[lot, intriguing, unique, aromas, nose, bottling, candied, pomegranate, wild,...<span class="op">|</span></span>
+<span id="cb9-37"><a href="#cb9-37" aria-hidden="true" tabindex="-1"></a><span class="op">|</span>Dry, lean <span class="kw">and</span> tight, this <span class="kw">is</span> a crisply mineral Sauvignon Blanc that manges to...<span class="op">|</span>[dry, lean, tight, crisply, mineral, sauvignon, blanc, manges, avoid, sense, ...<span class="op">|</span></span>
+<span id="cb9-38"><a href="#cb9-38" aria-hidden="true" tabindex="-1"></a><span class="op">+--------------------------------------------------------------------------------+--------------------------------------------------------------------------------+</span></span>
+<span id="cb9-39"><a href="#cb9-39" aria-hidden="true" tabindex="-1"></a>only showing top <span class="dv">5</span> rows</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p><strong>By computing TF × IDF, we can measure how important a word is within a single sentence while also evaluating how rare it is across the entire corpus. The resulting sparse numerical vectors allow machine learning models to interpret and learn from the text</strong></p>
+</section>
+</section>
+<section id="step-10-structured-feature-encoding-indexing-one-hot" class="level2" data-number="3.12">
+<h2 data-number="3.12" class="anchored" data-anchor-id="step-10-structured-feature-encoding-indexing-one-hot"><span class="header-section-number">3.12</span> Step 10 — Structured Feature Encoding (Indexing / One-Hot)</h2>
+<section id="purpose-6" class="level3" data-number="3.12.1">
+<h3 data-number="3.12.1" class="anchored" data-anchor-id="purpose-6"><span class="header-section-number">3.12.1</span> Purpose</h3>
+<p>After cleaning and text processing, we need all structured fields to be in a <em>numerical</em> format so they can be combined with TF-IDF features and used by ML models.<br>
+Spark models require vectors, not strings, so categorical columns must be transformed.</p>
+</section>
+<section id="what-we-did-8" class="level3" data-number="3.12.2">
+<h3 data-number="3.12.2" class="anchored" data-anchor-id="what-we-did-8"><span class="header-section-number">3.12.2</span> What We Did</h3>
+<ol type="1">
+<li><p><strong>Index categorical variables</strong><br>
+We used <code>StringIndexer</code> to convert:</p>
+<ul>
+<li><code>country_norm</code></li>
+<li><code>variety_canonical</code></li>
+<li><code>province_norm</code></li>
+</ul>
+<p>Each category is mapped to a numerical index.</p></li>
+<li><p><strong>One-hot encode indexed fields</strong><br>
+Using <code>OneHotEncoder</code> to avoid imposing ordinal meaning on categorical variables.<br>
+Each category becomes a sparse one-hot vector.</p></li>
+<li><p><strong>Combine all features</strong><br>
+We then assembled:</p>
+<ul>
+<li>numeric features (<code>points</code>, <code>price_winsor</code>)</li>
+<li>one-hot encoded vectors</li>
+<li>TF-IDF text features</li>
+</ul>
+<p>into a single feature vector using <code>VectorAssembler</code>.</p></li>
+<li><p><strong>Output</strong> The final dataset <code>df_ready</code> contains a <code>features</code> column suitable for:</p>
+<ul>
+<li>regression<br>
+</li>
+<li>classification<br>
+</li>
+<li>clustering<br>
+</li>
+<li>recommendation<br>
+</li>
+<li>or any ML algorithm in Spark MLlib. ```python from pyspark.ml.feature import StringIndexer, OneHotEncoder, VectorAssembler from pyspark.ml import Pipeline</li>
+</ul></li>
+</ol>
+<div class="sourceCode" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Step 10 — Structured Feature Encoding (Indexing / One-Hot)</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pyspark.ml.feature <span class="im">import</span> StringIndexer, OneHotEncoder, VectorAssembler</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pyspark.ml <span class="im">import</span> Pipeline</span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>categorical_cols <span class="op">=</span> [c <span class="cf">for</span> c <span class="kw">in</span> [<span class="st">"country_norm"</span>, <span class="st">"variety_canonical"</span>, <span class="st">"province_norm"</span>]</span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>                    <span class="cf">if</span> c <span class="kw">in</span> df_text_feats.columns]</span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a><span class="co"># index categorical fields</span></span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a>indexers <span class="op">=</span> [</span>
+<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a>    StringIndexer(inputCol<span class="op">=</span>c, outputCol<span class="op">=</span><span class="ss">f"</span><span class="sc">{</span>c<span class="sc">}</span><span class="ss">_idx"</span>, handleInvalid<span class="op">=</span><span class="st">"keep"</span>)</span>
+<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> c <span class="kw">in</span> categorical_cols</span>
+<span id="cb10-13"><a href="#cb10-13" aria-hidden="true" tabindex="-1"></a>]</span>
+<span id="cb10-14"><a href="#cb10-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-15"><a href="#cb10-15" aria-hidden="true" tabindex="-1"></a><span class="co"># one-hot encode</span></span>
+<span id="cb10-16"><a href="#cb10-16" aria-hidden="true" tabindex="-1"></a>encoders <span class="op">=</span> [</span>
+<span id="cb10-17"><a href="#cb10-17" aria-hidden="true" tabindex="-1"></a>    OneHotEncoder(inputCols<span class="op">=</span>[<span class="ss">f"</span><span class="sc">{</span>c<span class="sc">}</span><span class="ss">_idx"</span>], outputCols<span class="op">=</span>[<span class="ss">f"</span><span class="sc">{</span>c<span class="sc">}</span><span class="ss">_oh"</span>])</span>
+<span id="cb10-18"><a href="#cb10-18" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> c <span class="kw">in</span> categorical_cols</span>
+<span id="cb10-19"><a href="#cb10-19" aria-hidden="true" tabindex="-1"></a>]</span>
+<span id="cb10-20"><a href="#cb10-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-21"><a href="#cb10-21" aria-hidden="true" tabindex="-1"></a><span class="co"># numeric fields</span></span>
+<span id="cb10-22"><a href="#cb10-22" aria-hidden="true" tabindex="-1"></a>numeric_cols <span class="op">=</span> [c <span class="cf">for</span> c <span class="kw">in</span> [<span class="st">"points"</span>, <span class="st">"price_winsor"</span>] <span class="cf">if</span> c <span class="kw">in</span> df_text_feats.columns]</span>
+<span id="cb10-23"><a href="#cb10-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-24"><a href="#cb10-24" aria-hidden="true" tabindex="-1"></a><span class="co"># combine all features</span></span>
+<span id="cb10-25"><a href="#cb10-25" aria-hidden="true" tabindex="-1"></a>assembler <span class="op">=</span> VectorAssembler(</span>
+<span id="cb10-26"><a href="#cb10-26" aria-hidden="true" tabindex="-1"></a>    inputCols<span class="op">=</span>[<span class="op">*</span>numeric_cols, <span class="op">*</span>[<span class="ss">f"</span><span class="sc">{</span>c<span class="sc">}</span><span class="ss">_oh"</span> <span class="cf">for</span> c <span class="kw">in</span> categorical_cols], <span class="st">"tfidf"</span>],</span>
+<span id="cb10-27"><a href="#cb10-27" aria-hidden="true" tabindex="-1"></a>    outputCol<span class="op">=</span><span class="st">"features"</span></span>
+<span id="cb10-28"><a href="#cb10-28" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb10-29"><a href="#cb10-29" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-30"><a href="#cb10-30" aria-hidden="true" tabindex="-1"></a>struct_pipe <span class="op">=</span> Pipeline(stages<span class="op">=</span>[<span class="op">*</span>indexers, <span class="op">*</span>encoders, assembler])</span>
+<span id="cb10-31"><a href="#cb10-31" aria-hidden="true" tabindex="-1"></a>struct_model <span class="op">=</span> struct_pipe.fit(df_text_feats)</span>
+<span id="cb10-32"><a href="#cb10-32" aria-hidden="true" tabindex="-1"></a>df_ready <span class="op">=</span> struct_model.transform(df_text_feats)</span>
+<span id="cb10-33"><a href="#cb10-33" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-34"><a href="#cb10-34" aria-hidden="true" tabindex="-1"></a>df_ready.select(</span>
+<span id="cb10-35"><a href="#cb10-35" aria-hidden="true" tabindex="-1"></a>    <span class="st">"points"</span>, <span class="st">"price_winsor"</span>, <span class="op">*</span>[<span class="ss">f"</span><span class="sc">{</span>c<span class="sc">}</span><span class="ss">_oh"</span> <span class="cf">for</span> c <span class="kw">in</span> categorical_cols], <span class="st">"features"</span></span>
+<span id="cb10-36"><a href="#cb10-36" aria-hidden="true" tabindex="-1"></a>).show(<span class="dv">3</span>, truncate<span class="op">=</span><span class="dv">80</span>)</span>
+<span id="cb10-37"><a href="#cb10-37" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-38"><a href="#cb10-38" aria-hidden="true" tabindex="-1"></a>df_ready.printSchema()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p><strong>Step 10 prepares the dataset for model training by converting all fields into machine-learning-ready feature vectors</strong></p>
+</section>
+</section>
+<section id="step-11-persistence-and-output" class="level2" data-number="3.13">
+<h2 data-number="3.13" class="anchored" data-anchor-id="step-11-persistence-and-output"><span class="header-section-number">3.13</span> Step 11 — Persistence and Output</h2>
+<section id="purpose-7" class="level3" data-number="3.13.1">
+<h3 data-number="3.13.1" class="anchored" data-anchor-id="purpose-7"><span class="header-section-number">3.13.1</span> Purpose</h3>
+<p>After all cleaning and feature engineering steps, we save two final datasets and the preprocessing models.<br>
+Saving them allows: - fast reloading without repeating the whole pipeline, - consistent preprocessing across experiments, - distributed use (HDFS / S3 / cluster jobs), - and separation of “clean data” vs. “ML-ready data”.</p>
+</section>
+<section id="what-we-did-9" class="level3" data-number="3.13.2">
+<h3 data-number="3.13.2" class="anchored" data-anchor-id="what-we-did-9"><span class="header-section-number">3.13.2</span> What We Did</h3>
+<section id="save-the-cleaned-dataset" class="level4" data-number="3.13.2.1">
+<h4 data-number="3.13.2.1" class="anchored" data-anchor-id="save-the-cleaned-dataset"><span class="header-section-number">3.13.2.1</span> 1. Save the cleaned dataset</h4>
+<p>We selected the key cleaned columns and wrote them to<br>
+<code>outputs/wine_clean.parquet/</code>.<br>
+This file contains the fully cleaned but <strong>non-vectorized</strong> data.</p>
+</section>
+<section id="pca-reduction-for-tf-idf" class="level4" data-number="3.13.2.2">
+<h4 data-number="3.13.2.2" class="anchored" data-anchor-id="pca-reduction-for-tf-idf"><span class="header-section-number">3.13.2.2</span> 2. PCA reduction for TF-IDF</h4>
+<p>TF-IDF vectors are high-dimensional (≈8k dims), so we applied PCA to reduce them to <strong>≤ 500 dimensions</strong>.<br>
+This speeds up ML models and reduces memory usage.</p>
+</section>
+<section id="assemble-final-ml-features" class="level4" data-number="3.13.2.3">
+<h4 data-number="3.13.2.3" class="anchored" data-anchor-id="assemble-final-ml-features"><span class="header-section-number">3.13.2.3</span> 3. Assemble final ML features</h4>
+<p>We combined: - numerical fields (<code>points</code>, <code>price_winsor</code>), - one-hot encoded structured fields, - PCA-reduced TF-IDF vectors,<br>
+into a single <code>features</code> column suitable for MLlib.</p>
+</section>
+<section id="save-ml-ready-dataset" class="level4" data-number="3.13.2.4">
+<h4 data-number="3.13.2.4" class="anchored" data-anchor-id="save-ml-ready-dataset"><span class="header-section-number">3.13.2.4</span> 4. Save ML-ready dataset</h4>
+<p>The final modeling table (with <code>tfidf_pca</code> + <code>features</code>) was saved to<br>
+<code>outputs/wine_ml_ready.parquet/</code>.</p>
+</section>
+<section id="save-preprocessing-models" class="level4" data-number="3.13.2.5">
+<h4 data-number="3.13.2.5" class="anchored" data-anchor-id="save-preprocessing-models"><span class="header-section-number">3.13.2.5</span> 5. Save preprocessing models</h4>
+<p>We stored the fitted models: - text pipeline (<code>text_pipeline/</code>) - structured feature pipeline (<code>struct_pipeline/</code>) - PCA model (<code>pca_model/</code>)</p>
+<p>These reusable models ensure the exact same transformations can be applied later without recomputation.</p>
+</section>
+</section>
+<section id="result-5" class="level3" data-number="3.13.3">
+<h3 data-number="3.13.3" class="anchored" data-anchor-id="result-5"><span class="header-section-number">3.13.3</span> Result</h3>
+<p>The project now produces: - a <strong>cleaned dataset</strong> for EDA and analytics,<br>
+- a <strong>model-ready dataset</strong> for ML tasks,<br>
+- and <strong>modular preprocessing models</strong> that can be reused or deployed.</p>
+<p><strong>Step 11 stores all cleaned datasets, TF-IDF/PCA embeddings, structured encodings, the final feature vectors, and the preprocessing pipelines, preparing the data for actual machine learning model training.</strong></p>
+<p>With what we saved, we can perform a complete suite of scalable analytics and machine-learning experiments using wine_ml_ready.parquet, such as:</p>
+<p>regression models to predict prices or points,</p>
+<p>classification models for grape variety, region, or quality level,</p>
+<p>clustering wines based on PCA-reduced TF-IDF flavor profiles,</p>
+<p>k-NN similarity search for wine recommendation,</p>
+<p>and downstream visualizations built directly on the final feature vectors.</p>
+</section>
+</section>
+<section id="step-12-quick-sanity-check-eda" class="level2" data-number="3.14">
+<h2 data-number="3.14" class="anchored" data-anchor-id="step-12-quick-sanity-check-eda"><span class="header-section-number">3.14</span> Step 12 — Quick Sanity Check / EDA</h2>
+<section id="purpose-8" class="level3" data-number="3.14.1">
+<h3 data-number="3.14.1" class="anchored" data-anchor-id="purpose-8"><span class="header-section-number">3.14.1</span> Purpose</h3>
+<p>Before moving on to scalable analytics or ML modeling, we perform a quick sanity check to verify that the cleaned dataset behaves as expected.<br>
+This step is meant to confirm: - missing-value patterns are reasonable after cleaning, - major categorical variables have expected distributions, - there are no obvious issues remaining in the data.</p>
+</section>
+<section id="what-we-did-10" class="level3" data-number="3.14.2">
+<h3 data-number="3.14.2" class="anchored" data-anchor-id="what-we-did-10"><span class="header-section-number">3.14.2</span> What We Did</h3>
+<div class="sourceCode" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="co"># report of missing values (top 12 columns)</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>null_report(df_clean)[:<span class="dv">12</span>]</span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>[(<span class="st">'region_2'</span>, <span class="dv">73218</span>, <span class="fl">0.6102</span>),</span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a> (<span class="st">'region_2_norm'</span>, <span class="dv">73218</span>, <span class="fl">0.6102</span>),</span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a> (<span class="st">'designation'</span>, <span class="dv">34545</span>, <span class="fl">0.2879</span>),</span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a> (<span class="st">'designation_norm'</span>, <span class="dv">34545</span>, <span class="fl">0.2879</span>),</span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a> (<span class="st">'taster_twitter_handle'</span>, <span class="dv">29446</span>, <span class="fl">0.2454</span>),</span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a> (<span class="st">'taster_name'</span>, <span class="dv">24917</span>, <span class="fl">0.2077</span>),</span>
+<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a> (<span class="st">'taster_name_norm'</span>, <span class="dv">24917</span>, <span class="fl">0.2077</span>),</span>
+<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a> (<span class="st">'region_1'</span>, <span class="dv">19560</span>, <span class="fl">0.163</span>),</span>
+<span id="cb11-11"><a href="#cb11-11" aria-hidden="true" tabindex="-1"></a> (<span class="st">'region_1_norm'</span>, <span class="dv">19560</span>, <span class="fl">0.163</span>),</span>
+<span id="cb11-12"><a href="#cb11-12" aria-hidden="true" tabindex="-1"></a> (<span class="st">'price'</span>, <span class="dv">8395</span>, <span class="fl">0.07</span>),</span>
+<span id="cb11-13"><a href="#cb11-13" aria-hidden="true" tabindex="-1"></a> (<span class="st">'country_norm'</span>, <span class="dv">59</span>, <span class="fl">0.0005</span>),</span>
+<span id="cb11-14"><a href="#cb11-14" aria-hidden="true" tabindex="-1"></a> (<span class="st">'country'</span>, <span class="dv">59</span>, <span class="fl">0.0005</span>)]</span>
+<span id="cb11-15"><a href="#cb11-15" aria-hidden="true" tabindex="-1"></a> <span class="co"># Top 10 </span></span>
+<span id="cb11-16"><a href="#cb11-16" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> <span class="st">"country_norm"</span> <span class="kw">in</span> df_clean.columns:</span>
+<span id="cb11-17"><a href="#cb11-17" aria-hidden="true" tabindex="-1"></a>    display(df_clean.groupBy(<span class="st">"country_norm"</span>).count().orderBy(F.desc(<span class="st">"count"</span>)).limit(<span class="dv">10</span>))</span>
+<span id="cb11-18"><a href="#cb11-18" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span> <span class="st">"variety_canonical"</span> <span class="kw">in</span> df_clean.columns:</span>
+<span id="cb11-19"><a href="#cb11-19" aria-hidden="true" tabindex="-1"></a>    display(df_clean.groupBy(<span class="st">"variety_canonical"</span>).count().orderBy(F.desc(<span class="st">"count"</span>)).limit(<span class="dv">10</span>))</span>
+<span id="cb11-20"><a href="#cb11-20" aria-hidden="true" tabindex="-1"></a>df_clean.groupBy(<span class="st">"country_norm"</span>).count().orderBy(F.desc(<span class="st">"count"</span>)).show(<span class="dv">10</span>)</span>
+<span id="cb11-21"><a href="#cb11-21" aria-hidden="true" tabindex="-1"></a>df_clean.groupBy(<span class="st">"variety_canonical"</span>).count().orderBy(F.desc(<span class="st">"count"</span>)).show(<span class="dv">10</span>)</span>
+<span id="cb11-22"><a href="#cb11-22" aria-hidden="true" tabindex="-1"></a><span class="op">+------------+-----+</span></span>
+<span id="cb11-23"><a href="#cb11-23" aria-hidden="true" tabindex="-1"></a><span class="op">|</span>country_norm<span class="op">|</span>count<span class="op">|</span></span>
+<span id="cb11-24"><a href="#cb11-24" aria-hidden="true" tabindex="-1"></a><span class="op">+------------+-----+</span></span>
+<span id="cb11-25"><a href="#cb11-25" aria-hidden="true" tabindex="-1"></a><span class="op">|</span>          us<span class="op">|</span><span class="dv">50456</span><span class="op">|</span></span>
+<span id="cb11-26"><a href="#cb11-26" aria-hidden="true" tabindex="-1"></a><span class="op">|</span>      france<span class="op">|</span><span class="dv">20353</span><span class="op">|</span></span>
+<span id="cb11-27"><a href="#cb11-27" aria-hidden="true" tabindex="-1"></a><span class="op">|</span>       italy<span class="op">|</span><span class="dv">17940</span><span class="op">|</span></span>
+<span id="cb11-28"><a href="#cb11-28" aria-hidden="true" tabindex="-1"></a><span class="op">|</span>       spain<span class="op">|</span> <span class="dv">6116</span><span class="op">|</span></span>
+<span id="cb11-29"><a href="#cb11-29" aria-hidden="true" tabindex="-1"></a><span class="op">|</span>    portugal<span class="op">|</span> <span class="dv">5256</span><span class="op">|</span></span>
+<span id="cb11-30"><a href="#cb11-30" aria-hidden="true" tabindex="-1"></a><span class="op">|</span>       chile<span class="op">|</span> <span class="dv">4184</span><span class="op">|</span></span>
+<span id="cb11-31"><a href="#cb11-31" aria-hidden="true" tabindex="-1"></a><span class="op">|</span>   argentina<span class="op">|</span> <span class="dv">3544</span><span class="op">|</span></span>
+<span id="cb11-32"><a href="#cb11-32" aria-hidden="true" tabindex="-1"></a><span class="op">|</span>     austria<span class="op">|</span> <span class="dv">3034</span><span class="op">|</span></span>
+<span id="cb11-33"><a href="#cb11-33" aria-hidden="true" tabindex="-1"></a><span class="op">|</span>   australia<span class="op">|</span> <span class="dv">2196</span><span class="op">|</span></span>
+<span id="cb11-34"><a href="#cb11-34" aria-hidden="true" tabindex="-1"></a><span class="op">|</span>     germany<span class="op">|</span> <span class="dv">1992</span><span class="op">|</span></span>
+<span id="cb11-35"><a href="#cb11-35" aria-hidden="true" tabindex="-1"></a><span class="op">+------------+-----+</span></span>
+<span id="cb11-36"><a href="#cb11-36" aria-hidden="true" tabindex="-1"></a>only showing top <span class="dv">10</span> rows</span>
+<span id="cb11-37"><a href="#cb11-37" aria-hidden="true" tabindex="-1"></a><span class="op">+------------------+-----+</span></span>
+<span id="cb11-38"><a href="#cb11-38" aria-hidden="true" tabindex="-1"></a><span class="op">|</span> variety_canonical<span class="op">|</span>count<span class="op">|</span></span>
+<span id="cb11-39"><a href="#cb11-39" aria-hidden="true" tabindex="-1"></a><span class="op">+------------------+-----+</span></span>
+<span id="cb11-40"><a href="#cb11-40" aria-hidden="true" tabindex="-1"></a><span class="op">|</span>        pinot noir<span class="op">|</span><span class="dv">12344</span><span class="op">|</span></span>
+<span id="cb11-41"><a href="#cb11-41" aria-hidden="true" tabindex="-1"></a><span class="op">|</span>        chardonnay<span class="op">|</span><span class="dv">10868</span><span class="op">|</span></span>
+<span id="cb11-42"><a href="#cb11-42" aria-hidden="true" tabindex="-1"></a><span class="op">|</span>cabernet sauvignon<span class="op">|</span> <span class="dv">8850</span><span class="op">|</span></span>
+<span id="cb11-43"><a href="#cb11-43" aria-hidden="true" tabindex="-1"></a><span class="op">|</span>               red<span class="op">|</span> <span class="dv">8243</span><span class="op">|</span></span>
+<span id="cb11-44"><a href="#cb11-44" aria-hidden="true" tabindex="-1"></a><span class="op">|</span>bordeaux<span class="op">-</span>style red<span class="op">|</span> <span class="dv">6471</span><span class="op">|</span></span>
+<span id="cb11-45"><a href="#cb11-45" aria-hidden="true" tabindex="-1"></a><span class="op">|</span>          riesling<span class="op">|</span> <span class="dv">4773</span><span class="op">|</span></span>
+<span id="cb11-46"><a href="#cb11-46" aria-hidden="true" tabindex="-1"></a><span class="op">|</span>             syrah<span class="op">|</span> <span class="dv">4617</span><span class="op">|</span></span>
+<span id="cb11-47"><a href="#cb11-47" aria-hidden="true" tabindex="-1"></a><span class="op">|</span>   sauvignon blanc<span class="op">|</span> <span class="dv">4575</span><span class="op">|</span></span>
+<span id="cb11-48"><a href="#cb11-48" aria-hidden="true" tabindex="-1"></a><span class="op">|</span>              rose<span class="op">|</span> <span class="dv">3220</span><span class="op">|</span></span>
+<span id="cb11-49"><a href="#cb11-49" aria-hidden="true" tabindex="-1"></a><span class="op">|</span>            merlot<span class="op">|</span> <span class="dv">2896</span><span class="op">|</span></span>
+<span id="cb11-50"><a href="#cb11-50" aria-hidden="true" tabindex="-1"></a><span class="op">+------------------+-----+</span></span>
+<span id="cb11-51"><a href="#cb11-51" aria-hidden="true" tabindex="-1"></a>only showing top <span class="dv">10</span> rows</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<p>These are basic but essential checks to ensure: - normalized text fields group correctly, - synonym mapping worked, - and high-level distributions align with known wine data patterns<br>
+(e.g., U.S., France, Italy dominate; Pinot Noir and Chardonnay appear most frequently).</p>
+</section>
+<section id="result-6" class="level3" data-number="3.14.3">
+<h3 data-number="3.14.3" class="anchored" data-anchor-id="result-6"><span class="header-section-number">3.14.3</span> Result</h3>
+<p>The cleaned dataset passes all basic sanity checks.<br>
+The distributions look realistic and consistent with expectations, indicating that the cleaning pipeline is stable and suitable for further analysis and modeling.</p>
+</section>
+</section>
+<section id="step-13-appendix-how-to-reuse-the-same-preprocessing-pipeline-on-new-data" class="level2" data-number="3.15">
+<h2 data-number="3.15" class="anchored" data-anchor-id="step-13-appendix-how-to-reuse-the-same-preprocessing-pipeline-on-new-data"><span class="header-section-number">3.15</span> Step 13 — Appendix: How to Reuse the Same Preprocessing Pipeline on New Data</h2>
+<section id="purpose-9" class="level3" data-number="3.15.1">
+<h3 data-number="3.15.1" class="anchored" data-anchor-id="purpose-9"><span class="header-section-number">3.15.1</span> Purpose</h3>
+<p>To ensure consistent predictions on future data, we do <strong>not</strong> refit any preprocessing.<br>
+Instead, we reuse the saved pipelines so that text cleaning, tokenization, TF-IDF, PCA, indexing, and one-hot encoding behave exactly the same as during training.</p>
+</section>
+<section id="what-we-did-11" class="level3" data-number="3.15.2">
+<h3 data-number="3.15.2" class="anchored" data-anchor-id="what-we-did-11"><span class="header-section-number">3.15.2</span> What We Did</h3>
+<ol type="1">
+<li><p>Clean the new dataset using the same steps as before<br>
+(normalization, missing-value handling, etc.).</p></li>
+<li><p>Load the saved preprocessing models:</p>
+<ul>
+<li><code>text_pipeline</code> for description → tokens → TF-IDF → PCA<br>
+</li>
+<li><code>struct_pipeline</code> for indexing, one-hot, and feature assembly</li>
+</ul></li>
+<li><p>Apply them in order: new_df_text = loaded_text.transform(new_df_clean) new_df_ready = loaded_struct.transform(new_df_text) The result includes the same <code>tfidf_pca</code> and <code>features</code> columns used for modeling.</p></li>
+</ol>
+</section>
+<section id="result-7" class="level3" data-number="3.15.3">
+<h3 data-number="3.15.3" class="anchored" data-anchor-id="result-7"><span class="header-section-number">3.15.3</span> Result</h3>
+<p>Any new wine review can be transformed into the <strong>same feature space</strong> as the training data, enabling consistent prediction, clustering, or similarity search.</p>
+</section>
+</section>
+<section id="step-14-spark.stop" class="level2" data-number="3.16">
+<h2 data-number="3.16" class="anchored" data-anchor-id="step-14-spark.stop"><span class="header-section-number">3.16</span> Step 14 : spark.stop()</h2>
+</section>
+<section id="future-ml-tasks-and-analysis" class="level2" data-number="3.17">
+<h2 data-number="3.17" class="anchored" data-anchor-id="future-ml-tasks-and-analysis"><span class="header-section-number">3.17</span> Future ML Tasks and analysis</h2>
+<p>Using the processed dataset “wine_ml_ready.parquet” and the prebuilt “features” column(only for spark ML to read, didn’t print out), we</p>
+<p>can run several straightforward machine learning tasks. The following three tasks are</p>
+<p>simple, computationally reasonable, and highly suitable for this project.</p>
+<hr>
+<section id="price-prediction-regression" class="level3" data-number="3.17.1">
+<h3 data-number="3.17.1" class="anchored" data-anchor-id="price-prediction-regression"><span class="header-section-number">3.17.1</span> <strong>1. Price Prediction (Regression)</strong></h3>
+<p><strong>Goal:</strong><br>
+Predict the wine’s price (<code>price_winsor</code>) using numeric attributes + text features.</p>
+<p><strong>Reasons:</strong><br>
+Price is continuous, the dataset is large, and <code>features</code> already contains TF-IDF flavor vectors + metadata, making the model easy to train.</p>
+<p><strong>Model:</strong><br>
+- Linear Regression (very stable)<br>
+- Optional: Random Forest Regressor</p>
+<p><strong>Example question to explore:</strong><br>
+- <em>How much do tasting notes contribute to predicting price?</em><br>
+- <em>Does higher critic score (“points”) correlate with price?</em></p>
+<hr>
+</section>
+<section id="variety-classification-multiclass" class="level3" data-number="3.17.2">
+<h3 data-number="3.17.2" class="anchored" data-anchor-id="variety-classification-multiclass"><span class="header-section-number">3.17.2</span> <strong>2. Variety Classification (Multiclass)</strong></h3>
+<p><strong>Goal:</strong><br>
+Predict the standardized grape variety (<code>variety_canonical</code>) based on description + country + province.</p>
+<p><strong>Reason</strong><br>
+Variety is a strong label: tasting notes often directly imply varietal traits (“cherry + spice” → Pinot Noir).</p>
+<p><strong>Model:</strong><br>
+- Logistic Regression (multiclass)<br>
+- Optional: Naive Bayes (works well with TF-IDF)</p>
+<p><strong>Example question to explore:</strong><br>
+- <em>Which words in tasting notes indicate a particular grape variety?</em><br>
+- <em>Can a simple linear classifier distinguish red vs white varieties?</em></p>
+<hr>
+</section>
+<section id="country-of-origin-prediction-classification" class="level3" data-number="3.17.3">
+<h3 data-number="3.17.3" class="anchored" data-anchor-id="country-of-origin-prediction-classification"><span class="header-section-number">3.17.3</span> <strong>3. Country of Origin Prediction (Classification)</strong></h3>
+<p><strong>Goal:</strong><br>
+Predict <code>country_norm</code> from a wine’s text description.</p>
+<p><strong>Reason:</strong><br>
+Different regions use very distinct language (“minerality”, “oak”, “citrus”, etc.), so even simple models perform surprisingly well.</p>
+<p><strong>Model:</strong><br>
+- Logistic Regression<br>
+- Optional: Random Forest</p>
+<p><strong>Example question to explore:</strong><br>
+- <em>Which countries are easiest or hardest to distinguish?</em><br>
+- <em>What flavor words are most associated with France/US/Italy?</em></p>
+</section>
+</section>
+</section>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const onCopySuccess = function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  }
+  const getTextToCopy = function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+    text: getTextToCopy
+  });
+  clipboard.on('success', onCopySuccess);
+  if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+    // For code content inside modals, clipBoardJS needs to be initialized with a container option
+    // TODO: Check when it could be a function (https://github.com/zenorocha/clipboard.js/issues/860)
+    const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+      text: getTextToCopy,
+      container: window.document.getElementById('quarto-embedded-source-code-modal')
+    });
+    clipboardModal.on('success', onCopySuccess);
+  }
+    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+    var mailtoRegex = new RegExp(/^mailto:/);
+      var filterRegex = new RegExp('/' + window.location.host + '/');
+    var isInternal = (href) => {
+        return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+    }
+    // Inspect non-navigation links and adorn them if external
+ 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+    for (var i=0; i<links.length; i++) {
+      const link = links[i];
+      if (!isInternal(link.href)) {
+        // undo the damage that might have been done by quarto-nav.js in the case of
+        // links that we want to consider external
+        if (link.dataset.originalHref !== undefined) {
+          link.href = link.dataset.originalHref;
+        }
+      }
+    }
+  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+    const config = {
+      allowHTML: true,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start',
+    };
+    if (contentFn) {
+      config.content = contentFn;
+    }
+    if (onTriggerFn) {
+      config.onTrigger = onTriggerFn;
+    }
+    if (onUntriggerFn) {
+      config.onUntrigger = onUntriggerFn;
+    }
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      if (note) {
+        return note.innerHTML;
+      } else {
+        return "";
+      }
+    });
+  }
+  const xrefs = window.document.querySelectorAll('a.quarto-xref');
+  const processXRef = (id, note) => {
+    // Strip column container classes
+    const stripColumnClz = (el) => {
+      el.classList.remove("page-full", "page-columns");
+      if (el.children) {
+        for (const child of el.children) {
+          stripColumnClz(child);
+        }
+      }
+    }
+    stripColumnClz(note)
+    if (id === null || id.startsWith('sec-')) {
+      // Special case sections, only their first couple elements
+      const container = document.createElement("div");
+      if (note.children && note.children.length > 2) {
+        container.appendChild(note.children[0].cloneNode(true));
+        for (let i = 1; i < note.children.length; i++) {
+          const child = note.children[i];
+          if (child.tagName === "P" && child.innerText === "") {
+            continue;
+          } else {
+            container.appendChild(child.cloneNode(true));
+            break;
+          }
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(container);
+        }
+        return container.innerHTML
+      } else {
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        return note.innerHTML;
+      }
+    } else {
+      // Remove any anchor links if they are present
+      const anchorLink = note.querySelector('a.anchorjs-link');
+      if (anchorLink) {
+        anchorLink.remove();
+      }
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(note);
+      }
+      // TODO in 1.5, we should make sure this works without a callout special case
+      if (note.classList.contains("callout")) {
+        return note.outerHTML;
+      } else {
+        return note.innerHTML;
+      }
+    }
+  }
+  for (var i=0; i<xrefs.length; i++) {
+    const xref = xrefs[i];
+    tippyHover(xref, undefined, function(instance) {
+      instance.disable();
+      let url = xref.getAttribute('href');
+      let hash = undefined; 
+      if (url.startsWith('#')) {
+        hash = url;
+      } else {
+        try { hash = new URL(url).hash; } catch {}
+      }
+      if (hash) {
+        const id = hash.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note !== null) {
+          try {
+            const html = processXRef(id, note.cloneNode(true));
+            instance.setContent(html);
+          } finally {
+            instance.enable();
+            instance.show();
+          }
+        } else {
+          // See if we can fetch this
+          fetch(url.split('#')[0])
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.getElementById(id);
+            if (note !== null) {
+              const html = processXRef(id, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      } else {
+        // See if we can fetch a full url (with no hash to target)
+        // This is a special case and we should probably do some content thinning / targeting
+        fetch(url)
+        .then(res => res.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const htmlDoc = parser.parseFromString(html, "text/html");
+          const note = htmlDoc.querySelector('main.content');
+          if (note !== null) {
+            // This should only happen for chapter cross references
+            // (since there is no id in the URL)
+            // remove the first header
+            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+              note.children[0].remove();
+            }
+            const html = processXRef(null, note);
+            instance.setContent(html);
+          } 
+        }).finally(() => {
+          instance.enable();
+          instance.show();
+        });
+      }
+    }, function(instance) {
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            div.style.left = 0;
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+        // Handle positioning of the toggle
+    window.addEventListener(
+      "resize",
+      throttle(() => {
+        elRect = undefined;
+        if (selectedAnnoteEl) {
+          selectCodeLines(selectedAnnoteEl);
+        }
+      }, 10)
+    );
+    function throttle(fn, ms) {
+    let throttle = false;
+    let timer;
+      return (...args) => {
+        if(!throttle) { // first call gets through
+            fn.apply(this, args);
+            throttle = true;
+        } else { // all the others get throttled
+            if(timer) clearTimeout(timer); // cancel #2
+            timer = setTimeout(() => {
+              fn.apply(this, args);
+              timer = throttle = false;
+            }, ms);
+        }
+      };
+    }
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>
